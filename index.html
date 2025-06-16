@@ -6,61 +6,107 @@
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; }
     h2 { text-align: center; }
-    label, input { display: block; width: 100%; margin: 10px 0; }
-    input[type="number"] { padding: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background-color: #eee; }
+    input[type="number"] { width: 80px; }
     button { padding: 10px; margin-top: 15px; width: 100%; background-color: #007bff; color: white; border: none; border-radius: 5px; }
     .warning { color: red; font-weight: bold; margin-top: 10px; }
     .summary { margin-top: 20px; padding: 10px; background: white; border-radius: 5px; }
   </style>
 </head>
 <body>
-  <h2>NSC Hours-of-Service Calculator</h2><label for="day">Day # (1–7)</label> <input type="number" id="day" min="1" max="7">
+  <h2>NSC Hours-of-Service Calculator</h2>  <table>
+    <thead>
+      <tr>
+        <th>Day</th>
+        <th>Shift 1 Hours</th>
+        <th>Shift 2 Hours</th>
+        <th>Off-Duty Hours</th>
+        <th>Total Duty</th>
+        <th>TET (Max 24h)</th>
+        <th>Warnings</th>
+      </tr>
+    </thead>
+    <tbody id="logTable"></tbody>
+  </table><label for="day">Day # (1–14)</label> <input type="number" id="day" min="1" max="14">
 
-<label for="driving">Driving Hours Today</label> <input type="number" id="driving" min="0" max="14" step="0.1">
+<label for="shift1">Shift 1 Hours</label> <input type="number" id="shift1" min="0" max="14" step="0.1">
 
-<label for="onduty">On-Duty (non-driving) Hours Today</label> <input type="number" id="onduty" min="0" max="14" step="0.1">
+<label for="shift2">Shift 2 Hours</label> <input type="number" id="shift2" min="0" max="14" step="0.1">
 
 <label for="offduty">Off-Duty Hours Before Shift</label> <input type="number" id="offduty" min="0" max="24" step="0.1">
 
-<button onclick="calculate()">Check Day</button>
+<button onclick="calculateDay()">Add Day</button> <button onclick="resetLog()">Reset Log</button>
 
   <div class="warning" id="warning"></div>
   <div class="summary" id="summary"></div>  <script>
-    const weeklyOnDuty = Array(7).fill(0);
-    function calculate() {
-      const day = parseInt(document.getElementById('day').value) - 1;
-      const drive = parseFloat(document.getElementById('driving').value);
-      const duty = parseFloat(document.getElementById('onduty').value);
+    const logs = [];
+
+    function calculateDay() {
+      const day = parseInt(document.getElementById('day').value);
+      const shift1 = parseFloat(document.getElementById('shift1').value);
+      const shift2 = parseFloat(document.getElementById('shift2').value);
       const off = parseFloat(document.getElementById('offduty').value);
 
-      const warning = document.getElementById('warning');
-      const summary = document.getElementById('summary');
-      warning.innerHTML = '';
-      summary.innerHTML = '';
-
-      if (isNaN(day) || isNaN(drive) || isNaN(duty) || isNaN(off) || day < 0 || day > 6) {
-        warning.innerText = 'Please fill out all fields correctly (Day 1–7)';
+      if (isNaN(day) || isNaN(shift1) || isNaN(shift2) || isNaN(off) || day < 1 || day > 14) {
+        document.getElementById('warning').innerText = 'Please fill out all fields correctly (Day 1–14)';
         return;
       }
 
-      const totalDuty = drive + duty;
+      const totalDuty = shift1 + shift2;
       const TET = totalDuty + off;
+      let message = '';
 
-      weeklyOnDuty[day] = totalDuty;
-      const cumulative7 = weeklyOnDuty.reduce((a, b) => a + b, 0);
+      if (shift1 > 14) message += 'Shift 1 exceeds 14h. ';
+      if (shift2 > 14) message += 'Shift 2 exceeds 14h. ';
+      if (totalDuty > 14) message += 'Exceeds 14h total duty. ';
+      if (TET > 24) message += 'TET exceeds 24h. ';
+      if (off < 8) message += 'Off-duty < 8h. ';
 
-      let messages = [];
-      if (drive > 14) messages.push('Driving time exceeds 14-hour daily max.');
-      if (totalDuty > 14) messages.push('On-duty time exceeds 14-hour daily max.');
-      if (TET > 16) messages.push('Total Elapsed Time exceeds 16-hour limit.');
-      if (off < 8) messages.push('Minimum 8 hours off-duty not met.');
-      if (cumulative7 > 70) messages.push('Over 70 hours on-duty in 7 days – RESET REQUIRED.');
+      logs[day - 1] = { day, shift1, shift2, off, totalDuty, TET, message };
 
-      if (messages.length > 0) {
-        warning.innerHTML = messages.join('<br>');
-      } else {
-        summary.innerHTML = `✅ All checks passed for Day ${day + 1}.<br>Total on-duty hours this week: ${cumulative7.toFixed(1)} hours.`;
-      }
+      updateTable();
+    }
+
+    function updateTable() {
+      const tbody = document.getElementById('logTable');
+      tbody.innerHTML = '';
+      let week1 = 0, week2 = 0, has24hrOff = false;
+
+      logs.forEach((log, i) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${log.day}</td>
+          <td>${log.shift1}</td>
+          <td>${log.shift2}</td>
+          <td>${log.off}</td>
+          <td>${log.totalDuty}</td>
+          <td>${log.TET}</td>
+          <td class="warning">${log.message}</td>
+        `;
+        tbody.appendChild(row);
+
+        if (i < 7) week1 += log.totalDuty;
+        else week2 += log.totalDuty;
+
+        if (log.off >= 24) has24hrOff = true;
+      });
+
+      const summary = document.getElementById('summary');
+      summary.innerHTML = `
+        Week 1 On-Duty Total: ${week1.toFixed(1)}h<br>
+        Week 2 On-Duty Total: ${week2.toFixed(1)}h<br>
+        ${week1 > 70 || week2 > 70 ? '<span class="warning">Reset required: over 70h on-duty in a 7-day period.</span><br>' : ''}
+        ${has24hrOff ? '✅ 24h consecutive off-duty taken in 14 days.' : '<span class="warning">❌ 24h off-duty in 14 days NOT taken.</span>'}
+      `;
+    }
+
+    function resetLog() {
+      logs.length = 0;
+      updateTable();
+      document.getElementById('summary').innerHTML = '';
+      document.getElementById('warning').innerHTML = '';
     }
   </script></body>
 </html>
