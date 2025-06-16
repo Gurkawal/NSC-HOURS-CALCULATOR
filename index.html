@@ -1,134 +1,100 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html><html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NSC Compliance Checker</title>
+  <meta charset="UTF-8">
+  <title>NSC Hours Checker</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      background: #f0f0f0;
-    }
-    h1 {
-      color: #333;
-    }
-    input, select, button {
-      margin: 5px 0;
-      padding: 8px;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: center;
-    }
-    th {
-      background-color: #eee;
-    }
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f0f0f0; }
+    input { margin: 5px; padding: 8px; width: 200px; }
+    button { padding: 10px 20px; margin-top: 10px; }
+    table { border-collapse: collapse; margin-top: 20px; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background: #eee; }
   </style>
 </head>
 <body>
-  <h1>NSC Duty Hours Compliance Checker</h1>  <form id="dayForm">
-    <label for="s1s">Shift 1 Start (24h):</label>
-    <input type="time" id="s1s" name="s1s" required /><label for="s1e">Shift 1 End (24h):</label>
-<input type="time" id="s1e" name="s1e" required />
-
-<label for="s2s">Shift 2 Start (optional):</label>
-<input type="time" id="s2s" name="s2s" />
-
-<label for="s2e">Shift 2 End (optional):</label>
-<input type="time" id="s2e" name="s2e" />
-
-<label for="ots">Overtime Start (optional):</label>
-<input type="time" id="ots" name="ots" />
-
-<label for="ote">Overtime End (optional):</label>
-<input type="time" id="ote" name="ote" />
-
-<button type="submit">Submit Day</button>
-
-  </form>  <div id="output"></div>  <script>
-    const form = document.getElementById('dayForm');
-    const output = document.getElementById('output');
-    let prevEndMinutes = null;
-    let total7DayHours = 0;
+  <h2>NSC Hours Checker</h2>
+  <form id="dayForm">
+    <label>Shift 1 Start (e.g. 0500): <input type="text" id="s1start"></label><br>
+    <label>Shift 1 End (e.g. 1300): <input type="text" id="s1end"></label><br>
+    <label>Shift 2 Start (optional): <input type="text" id="s2start"></label><br>
+    <label>Shift 2 End (optional): <input type="text" id="s2end"></label><br>
+    <label>Overtime Before Shift 1 (optional): <input type="text" id="ot1"></label><br>
+    <label>Overtime Between Shifts (optional): <input type="text" id="ot2"></label><br>
+    <label>Overtime After Shift 2 (optional): <input type="text" id="ot3"></label><br>
+    <button type="submit">Submit Day</button>
+  </form>  <table id="logTable">
+    <tr>
+      <th>Day</th><th>Shift 1 (hrs)</th><th>Shift 2 (hrs)</th><th>Split (hrs)</th><th>OT (hrs)</th><th>Total Duty</th><th>TET</th><th>Off Duty</th><th>NSC Violation</th>
+    </tr>
+  </table>  <script>
+    let prevEnd = null;
+    let total7Days = [];
     let dayCount = 0;
 
-    function parseMilitaryTime(timeStr) {
-      if (!timeStr) return null;
-      const [h, m] = timeStr.split(":").map(Number);
+    function parseTime(str) {
+      if (!str) return null;
+      const num = parseInt(str, 10);
+      const h = Math.floor(num / 100), m = num % 100;
       return h * 60 + m;
     }
 
-    form.addEventListener('submit', function(e) {
+    function timeDiff(start, end) {
+      if (start === null || end === null) return 0;
+      if (end < start) end += 2400;
+      return (end - start) / 100;
+    }
+
+    function hourDiff(min1, min2) {
+      if (min1 === null || min2 === null) return 0;
+      if (min2 < min1) min2 += 1440;
+      return (min2 - min1) / 60;
+    }
+
+    document.getElementById("dayForm").addEventListener("submit", function(e) {
       e.preventDefault();
-      const s1s = form.s1s.value;
-      const s1e = form.s1e.value;
-      const s2s = form.s2s.value;
-      const s2e = form.s2e.value;
-      const ots = form.ots.value;
-      const ote = form.ote.value;
+      const s1s = parseTime(document.getElementById("s1start").value);
+      const s1e = parseTime(document.getElementById("s1end").value);
+      const s2s = parseTime(document.getElementById("s2start").value);
+      const s2e = parseTime(document.getElementById("s2end").value);
+      const ot1 = parseTime(document.getElementById("ot1").value);
+      const ot2 = parseTime(document.getElementById("ot2").value);
+      const ot3 = parseTime(document.getElementById("ot3").value);
 
-      const s1Start = parseMilitaryTime(s1s);
-      let s1End = parseMilitaryTime(s1e);
-      if (s1End < s1Start) s1End += 1440;
-      const shift1 = (s1End - s1Start) / 60;
+      const shift1 = hourDiff(s1s, s1e);
+      const shift2 = (s2s !== null && s2e !== null) ? hourDiff(s2s, s2e) : 0;
+      const split = (s2s !== null) ? hourDiff(s1e, s2s) : 0;
+      const otTotal = hourDiff(ot1, s1s) + hourDiff(s1e, ot2) + hourDiff(s2e || s1e, ot3);
+      const totalDuty = shift1 + shift2 + otTotal;
+      const tet = (s2e !== null ? hourDiff(s1s, s2e) : shift1);
 
-      let shift2 = 0;
-      let s2Start = parseMilitaryTime(s2s);
-      let s2End = parseMilitaryTime(s2e);
-      if (s2Start !== null && s2End !== null) {
-        if (s2End < s2Start) s2End += 1440;
-        shift2 = (s2End - s2Start) / 60;
-      }
+      let offDuty = prevEnd !== null ? hourDiff(prevEnd, s1s < prevEnd ? s1s + 1440 : s1s) : 24;
+      prevEnd = s2e || s1e;
 
-      let splitHours = 0;
-      if (s2Start !== null) {
-        if (s2Start < s1End) s2Start += 1440;
-        splitHours = (s2Start - s1End) / 60;
-      }
+      total7Days.push(totalDuty);
+      if (total7Days.length > 7) total7Days.shift();
+      const rolling7 = total7Days.reduce((a, b) => a + b, 0);
 
-      let otHours = 0;
-      let otStart = parseMilitaryTime(ots);
-      let otEnd = parseMilitaryTime(ote);
-      if (otStart !== null && otEnd !== null) {
-        if (otEnd < otStart) otEnd += 1440;
-        otHours = (otEnd - otStart) / 60;
-      }
+      let violations = [];
+      if (totalDuty > 14) violations.push(">14 duty hrs");
+      if (shift1 + shift2 > 13) violations.push(">13 driving hrs");
+      if (tet > 16) violations.push(">16 TET");
+      if (offDuty < 8) violations.push("<8 hr off-duty");
+      if (rolling7 > 70) violations.push(">70 hrs/7 days");
 
-      const totalDuty = shift1 + shift2 + otHours;
-      const tet = shift2 ? (s2End - s1Start) / 60 : shift1;
-
-      let offDuty = 0;
-      if (prevEndMinutes !== null) {
-        const currStartMinutes = s1Start < prevEndMinutes ? s1Start + 1440 : s1Start;
-        offDuty = (currStartMinutes - prevEndMinutes) / 60;
-      }
-      prevEndMinutes = s2End || s1End;
-
-      const violations = [];
-      if (shift1 + shift2 > 14) violations.push("More than 14 on-duty hours");
-      if (shift1 + shift2 > 13) violations.push("More than 13 driving hours");
-      if (tet > 16) violations.push("More than 16 hours TET");
-      if (offDuty < 8) violations.push("Less than 8 consecutive hours off-duty before start");
-      total7DayHours += shift1 + shift2;
-      if (++dayCount > 6 && total7DayHours > 70) violations.push("More than 70 on-duty hours in 7 days");
-
-      const row = `
-        <table>
-          <tr><th>Day</th><th>Shift 1 (hrs)</th><th>Shift 2 (hrs)</th><th>Split (hrs)</th><th>OT (hrs)</th><th>Total Duty (hrs)</th><th>TET (hrs)</th><th>Off-duty (hrs)</th><th>Violations</th></tr>
-          <tr><td>${dayCount}</td><td>${shift1}</td><td>${shift2}</td><td>${splitHours}</td><td>${otHours}</td><td>${totalDuty}</td><td>${tet}</td><td>${offDuty.toFixed(2)}</td><td>${violations.join(", ") || "None"}</td></tr>
-        </table>
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${++dayCount}</td>
+        <td>${shift1.toFixed(2)}</td>
+        <td>${shift2.toFixed(2)}</td>
+        <td>${split.toFixed(2)}</td>
+        <td>${otTotal.toFixed(2)}</td>
+        <td>${totalDuty.toFixed(2)}</td>
+        <td>${tet.toFixed(2)}</td>
+        <td>${offDuty.toFixed(2)}</td>
+        <td>${violations.length ? violations.join(", ") : "None"}</td>
       `;
-
-      output.innerHTML = row + output.innerHTML;
-      form.reset();
+      document.getElementById("logTable").appendChild(row);
+      document.getElementById("dayForm").reset();
     });
   </script></body>
 </html>
