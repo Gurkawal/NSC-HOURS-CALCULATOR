@@ -1,4 +1,5 @@
-<!DOCTYPE html><html>
+<!DOCTYPE html>
+<html>
 <head>
   <meta charset="UTF-8">
   <title>NSC Hours Checker</title>
@@ -22,11 +23,16 @@
     <label>Overtime Between Shifts (optional): <input type="text" id="ot2"></label><br>
     <label>Overtime After Shift 2 (optional): <input type="text" id="ot3"></label><br>
     <button type="submit">Submit Day</button>
-  </form>  <table id="logTable">
+  </form>
+
+  <table id="logTable">
     <tr>
-      <th>Day</th><th>Shift 1 (hrs)</th><th>Shift 2 (hrs)</th><th>Split (hrs)</th><th>OT (hrs)</th><th>Total Duty</th><th>TET</th><th>Off Duty</th><th>NSC Violation</th>
+      <th>Day</th><th>Shift 1 (hrs)</th><th>Shift 2 (hrs)</th><th>Split (hrs)</th>
+      <th>OT (hrs)</th><th>Total Duty</th><th>TET</th><th>Off Duty</th><th>NSC Violation</th>
     </tr>
-  </table>  <script>
+  </table>
+
+  <script>
     let prevEnd = null;
     let prevStart = null;
     let total7Days = [];
@@ -37,12 +43,6 @@
       const num = parseInt(str, 10);
       const h = Math.floor(num / 100), m = num % 100;
       return h * 60 + m;
-    }
-
-    function timeDiff(start, end) {
-      if (start === null || end === null) return 0;
-      if (end < start) end += 2400;
-      return (end - start) / 100;
     }
 
     function hourDiff(min1, min2) {
@@ -64,6 +64,7 @@
       const shift1 = hourDiff(s1s, s1e);
       const shift2 = (s2s !== null && s2e !== null) ? hourDiff(s2s, s2e) : 0;
       const split = (s2s !== null) ? hourDiff(s1e, s2s) : 0;
+
       const otTotal = hourDiff(ot1, s1s) + hourDiff(s1e, ot2) + hourDiff(s2e || s1e, ot3);
       const totalDuty = shift1 + shift2 + otTotal;
       const tet = (s2e !== null ? hourDiff(s1s, s2e) : shift1);
@@ -73,7 +74,7 @@
         offDuty = hourDiff(prevEnd, s1s);
       }
 
-      // Only count as new day if off-duty >= 8 hours
+      // Only count new day if off-duty ≥ 8 hrs
       if (prevEnd === null || offDuty >= 8) {
         dayCount++;
       }
@@ -107,5 +108,6 @@
       document.getElementById("logTable").appendChild(row);
       document.getElementById("dayForm").reset();
     });
-  </script></body>
+  </script>
+</body>
 </html>
