@@ -7,46 +7,46 @@
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
-      background: url('https://images.unsplash.com/photo-1604251609430-634cfb4b21c0?auto=format&fit=crop&w=1470&q=80') no-repeat center center fixed;
-      background-size: cover;
-      color: #fff;
+      background: #f5f5f5;
+      color: #000;
     }
-    h2, h3 { text-align: center; color: #fff; }
+    h2, h3 { text-align: center; color: #000; }
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 20px;
-      background-color: rgba(0, 102, 204, 0.9);
-      color: #fff;
+      background-color: #fff;
+      color: #000;
     }
     th, td {
-      border: 1px solid #fff;
+      border: 1px solid #000;
       padding: 8px;
       text-align: center;
     }
-    th { background-color: #004080; }
+    th { background-color: #ddd; }
     input[type="number"] {
       width: 80px;
-      background-color: #e6f2ff;
+      background-color: #fff;
       color: #000;
-      border: 1px solid #004080;
+      border: 1px solid #ccc;
     }
     button {
       padding: 10px;
       margin-top: 15px;
       width: 100%;
-      background-color: #0059b3;
+      background-color: #333;
       color: white;
       border: none;
       border-radius: 5px;
       font-weight: bold;
     }
-    .warning { color: yellow; font-weight: bold; margin-top: 10px; }
+    .warning { color: red; font-weight: bold; margin-top: 10px; }
     .summary {
       margin-top: 20px;
       padding: 10px;
-      background: rgba(255, 255, 255, 0.9);
+      background: #fff;
       color: #000;
+      border: 1px solid #ccc;
       border-radius: 5px;
     }
   </style>
@@ -69,8 +69,8 @@
   </table>  <div id="inputSection">
     <h3>Enter Hours for Day <span id="currentDay">1</span></h3>
     <label for="shift1">Shift 1 Hours</label>
-    <input type="number" id="shift1" min="0" max="14" step="0.1"><label for="shift2">Shift 2 Hours</label>
-<input type="number" id="shift2" min="0" max="14" step="0.1">
+    <input type="number" id="shift1" min="0" max="13" step="0.1"><label for="shift2">Shift 2 Hours</label>
+<input type="number" id="shift2" min="0" max="13" step="0.1">
 
 <label for="offduty">Off-Duty Hours Before Shift</label>
 <input type="number" id="offduty" min="0" max="24" step="0.1">
@@ -94,14 +94,14 @@
         return;
       }
 
-      const split = 24 - shift1 - shift2 - off;
       const totalDuty = shift1 + shift2;
-      const TET = totalDuty + off + split;
+      const split = 24 - shift1 - shift2 - off;
+      const TET = shift1 + shift2 + split;
       let message = '';
 
-      if (shift1 > 14) message += 'Shift 1 exceeds 14h. ';
-      if (shift2 > 14) message += 'Shift 2 exceeds 14h. ';
-      if (totalDuty > 14) message += 'Exceeds 14h total duty. ';
+      if (shift1 > 13) message += 'Shift 1 exceeds 13h driving. ';
+      if (shift2 > 13) message += 'Shift 2 exceeds 13h driving. ';
+      if (totalDuty > 14) message += 'Exceeds 14h on-duty limit. ';
       if (TET > 16) message += 'TET exceeds 16h. ';
       if (off < 8) message += 'Off-duty < 8h. ';
 
