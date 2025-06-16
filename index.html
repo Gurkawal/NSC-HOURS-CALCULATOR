@@ -24,8 +24,8 @@
       text-align: center;
     }
     th { background-color: #ddd; }
-    input[type="number"] {
-      width: 80px;
+    input[type="time"], input[type="number"] {
+      width: 120px;
       background-color: #fff;
       color: #000;
       border: 1px solid #ccc;
@@ -56,24 +56,34 @@
     <thead>
       <tr>
         <th>Day</th>
-        <th>Shift 1 Hours</th>
-        <th>Shift 2 Hours</th>
-        <th>Split (Non-Working) Hours</th>
-        <th>Off-Duty Hours</th>
-        <th>Total Duty</th>
+        <th>Shift 1</th>
+        <th>Shift 2</th>
+        <th>Split (Non-working)</th>
+        <th>Overtime (Before / Between / After)</th>
+        <th>Total Duty Hours</th>
+        <th>Off-Duty After Shift 2</th>
         <th>TET (Max 16h)</th>
         <th>Warnings</th>
       </tr>
     </thead>
     <tbody id="logTable"></tbody>
   </table>  <div id="inputSection">
-    <h3>Enter Hours for Day <span id="currentDay">1</span></h3>
-    <label for="shift1">Shift 1 Hours</label>
-    <input type="number" id="shift1" min="0" max="13" step="0.1"><label for="shift2">Shift 2 Hours</label>
-<input type="number" id="shift2" min="0" max="13" step="0.1">
+    <h3>Enter Times for Day <span id="currentDay">1</span></h3><label>Shift 1 Start:</label>
+<input type="time" id="shift1Start">
+<label>Shift 1 End:</label>
+<input type="time" id="shift1End"><br><br>
 
-<label for="offduty">Off-Duty Hours Before Shift</label>
-<input type="number" id="offduty" min="0" max="24" step="0.1">
+<label>Shift 2 Start:</label>
+<input type="time" id="shift2Start">
+<label>Shift 2 End:</label>
+<input type="time" id="shift2End"><br><br>
+
+<label>Overtime Before Shift 1 (hrs):</label>
+<input type="number" id="otBefore" min="0" step="0.1">
+<label>Between Shifts:</label>
+<input type="number" id="otBetween" min="0" step="0.1">
+<label>After Shift 2:</label>
+<input type="number" id="otAfter" min="0" step="0.1"><br><br>
 
 <button onclick="calculateDay()">Submit Day</button>
 
@@ -83,41 +93,72 @@
   <div class="summary" id="summary"></div>  <script>
     const logs = [];
     let currentDay = 1;
+    let prevShift2End = null;
+
+    function timeDiff(start, end) {
+      const [sh, sm] = start.split(":").map(Number);
+      const [eh, em] = end.split(":").map(Number);
+      let diff = (eh * 60 + em) - (sh * 60 + sm);
+      if (diff < 0) diff += 1440;
+      return diff / 60;
+    }
 
     function calculateDay() {
-      const shift1 = parseFloat(document.getElementById('shift1').value);
-      const shift2 = parseFloat(document.getElementById('shift2').value);
-      const off = parseFloat(document.getElementById('offduty').value);
+      const s1s = document.getElementById('shift1Start').value;
+      const s1e = document.getElementById('shift1End').value;
+      const s2s = document.getElementById('shift2Start').value;
+      const s2e = document.getElementById('shift2End').value;
+      const otBefore = parseFloat(document.getElementById('otBefore').value || 0);
+      const otBetween = parseFloat(document.getElementById('otBetween').value || 0);
+      const otAfter = parseFloat(document.getElementById('otAfter').value || 0);
 
-      if (isNaN(shift1) || isNaN(shift2) || isNaN(off)) {
-        document.getElementById('warning').innerText = 'Please fill out all fields correctly.';
+      if (!s1s || !s1e || !s2s || !s2e) {
+        document.getElementById('warning').innerText = 'Please enter all shift times.';
         return;
       }
 
-      const totalDuty = shift1 + shift2;
-      const split = 24 - shift1 - shift2 - off;
-      const TET = shift1 + shift2 + split;
-      let message = '';
+      const shift1Hrs = timeDiff(s1s, s1e);
+      const shift2Hrs = timeDiff(s2s, s2e);
+      const split = timeDiff(s1e, s2s);
+      const totalOT = otBefore + otBetween + otAfter;
+      const dutyHours = shift1Hrs + shift2Hrs + totalOT;
+      let offDuty = 0;
 
-      if (shift1 > 13) message += 'Shift 1 exceeds 13h driving. ';
-      if (shift2 > 13) message += 'Shift 2 exceeds 13h driving. ';
-      if (totalDuty > 14) message += 'Exceeds 14h on-duty limit. ';
-      if (TET > 16) message += 'TET exceeds 16h. ';
-      if (off < 8) message += 'Off-duty < 8h. ';
+      if (prevShift2End) {
+        offDuty = timeDiff(prevShift2End, s1s);
+      }
 
-      logs[currentDay - 1] = { day: currentDay, shift1, shift2, split, off, totalDuty, TET, message };
+      const TET = shift1Hrs + split + shift2Hrs;
+      let warning = '';
 
+      if (shift1Hrs > 13) warning += 'Shift 1 exceeds 13h. ';
+      if (shift2Hrs > 13) warning += 'Shift 2 exceeds 13h. ';
+      if (dutyHours > 14) warning += 'Duty exceeds 14h/day. ';
+      if (TET > 16) warning += 'TET exceeds 16h. ';
+      if (offDuty && offDuty < 8) warning += 'Off-duty < 8h. ';
+
+      logs.push({
+        day: currentDay,
+        shift1: `${s1s}–${s1e}`,
+        shift2: `${s2s}–${s2e}`,
+        split: split.toFixed(2),
+        overtime: `${otBefore + otBetween + otAfter}h`,
+        total: dutyHours.toFixed(2),
+        offDuty: offDuty.toFixed(2),
+        TET: TET.toFixed(2),
+        warning
+      });
+
+      prevShift2End = s2e;
+      currentDay++;
       updateTable();
 
-      currentDay++;
       if (currentDay > 14) {
         document.getElementById('inputSection').style.display = 'none';
         document.getElementById('warning').innerText = 'All 14 days entered.';
       } else {
         document.getElementById('currentDay').innerText = currentDay;
-        document.getElementById('shift1').value = '';
-        document.getElementById('shift2').value = '';
-        document.getElementById('offduty').value = '';
+        document.querySelectorAll('input').forEach(i => i.value = '');
         document.getElementById('warning').innerText = '';
       }
     }
@@ -133,18 +174,20 @@
           <td>${log.day}</td>
           <td>${log.shift1}</td>
           <td>${log.shift2}</td>
-          <td>${log.split.toFixed(1)}</td>
-          <td>${log.off}</td>
-          <td>${log.totalDuty}</td>
-          <td>${log.TET.toFixed(1)}</td>
-          <td class="warning">${log.message}</td>
+          <td>${log.split}</td>
+          <td>${log.overtime}</td>
+          <td>${log.total}</td>
+          <td>${log.offDuty}</td>
+          <td>${log.TET}</td>
+          <td class="warning">${log.warning}</td>
         `;
         tbody.appendChild(row);
 
-        if (i < 7) week1 += log.totalDuty;
-        else week2 += log.totalDuty;
+        const duty = parseFloat(log.total);
+        if (i < 7) week1 += duty;
+        else week2 += duty;
 
-        if (log.off >= 24) has24hrOff = true;
+        if (parseFloat(log.offDuty) >= 24) has24hrOff = true;
       });
 
       const summary = document.getElementById('summary');
@@ -159,6 +202,7 @@
     function resetLog() {
       logs.length = 0;
       currentDay = 1;
+      prevShift2End = null;
       document.getElementById('currentDay').innerText = currentDay;
       document.getElementById('inputSection').style.display = 'block';
       updateTable();
