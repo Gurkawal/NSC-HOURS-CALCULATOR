@@ -1,73 +1,32 @@
-
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NSC Hours-of-Service Calculator</title>
+  <title>NSC Hours Calculator</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; }
-    h1 { color: #00457c; }
-    label { display: block; margin: 10px 0 5px; }
-    input, select { width: 100%; padding: 8px; margin-bottom: 10px; }
-    button { background: #00457c; color: white; padding: 10px 15px; border: none; cursor: pointer; }
-    button:hover { background: #0066cc; }
-    .result { background: #fff; padding: 15px; border-radius: 5px; margin-top: 20px; }
+    h2 { text-align: center; }
+    label, input { display: block; width: 100%; margin: 10px 0; }
+    input[type="number"] { padding: 8px; }
+    button { padding: 10px; margin-top: 15px; width: 100%; background-color: #007bff; color: white; border: none; border-radius: 5px; }
+    .warning { color: red; font-weight: bold; margin-top: 10px; }
+    .summary { margin-top: 20px; padding: 10px; background: white; border-radius: 5px; }
   </style>
 </head>
 <body>
-  <h1>NSC Hours-of-Service Calculator</h1>
-  <form id="hosForm">
-    <label for="cycle">Select Cycle:</label>
-    <select id="cycle">
-      <option value="1">Cycle 1 (70 hrs/7 days)</option>
-      <option value="2">Cycle 2 (120 hrs/14 days)</option>
-    </select>
+  <h2>NSC Hours-of-Service Calculator</h2><label for="day">Day # (1–7)</label> <input type="number" id="day" min="1" max="7">
 
-    <label for="driveToday">Driving hours today:</label>
-    <input type="number" id="driveToday" min="0" step="0.1">
+<label for="driving">Driving Hours Today</label> <input type="number" id="driving" min="0" max="14" step="0.1">
 
-    <label for="dutyToday">On-duty (non-driving) hours today:</label>
-    <input type="number" id="dutyToday" min="0" step="0.1">
+<label for="onduty">On-Duty (non-driving) Hours Today</label> <input type="number" id="onduty" min="0" max="14" step="0.1">
 
-    <label for="dutyCycle">Total on-duty hours in cycle:</label>
-    <input type="number" id="dutyCycle" min="0" step="0.1">
+<label for="offduty">Off-Duty Hours Before Shift</label> <input type="number" id="offduty" min="0" max="24" step="0.1">
 
-    <button type="button" onclick="calculateHOS()">Calculate</button>
-  </form>
+<button onclick="calculate()">Check Day</button>
 
-  <div class="result" id="resultBox" style="display:none">
-    <h2>Results</h2>
-    <p id="remainingDrive"></p>
-    <p id="remainingDuty"></p>
-    <p id="remainingCycle"></p>
-    <p id="compliance"></p>
-  </div>
-
-  <script>
-    function calculateHOS() {
-      const cycle = document.getElementById("cycle").value;
-      const driveToday = parseFloat(document.getElementById("driveToday").value) || 0;
-      const dutyToday = parseFloat(document.getElementById("dutyToday").value) || 0;
-      const dutyCycle = parseFloat(document.getElementById("dutyCycle").value) || 0;
-
-      const maxDrive = 13;
-      const maxDuty = 14;
-      const maxCycle = cycle === "1" ? 70 : 120;
-
-      const remainingDrive = maxDrive - driveToday;
-      const remainingDuty = maxDuty - (driveToday + dutyToday);
-      const remainingCycle = maxCycle - dutyCycle;
-
-      const compliant = remainingDrive >= 0 && remainingDuty >= 0 && remainingCycle >= 0;
-
-      document.getElementById("remainingDrive").textContent = `Remaining driving hours today: ${remainingDrive.toFixed(2)} hrs`;
-      document.getElementById("remainingDuty").textContent = `Remaining on-duty hours today: ${remainingDuty.toFixed(2)} hrs`;
-      document.getElementById("remainingCycle").textContent = `Remaining on-duty hours in cycle: ${remainingCycle.toFixed(2)} hrs`;
-      document.getElementById("compliance").textContent = `Compliance Status: ${compliant ? "✅ Compliant" : "❌ Non-Compliant"}`;
-
-      document.getElementById("resultBox").style.display = 'block';
-    }
-  </script>
-</body>
-</html>
+  <div class="warning" id="warning"></div>
+  <div class="summary" id="summary"></div>  <script>
+    const weeklyOnDuty = Array(7).fill(0);
+    function calculate() {
+      const day = parseInt(document.getElementById('day').value) - 1;
+     
