@@ -28,6 +28,7 @@
     </tr>
   </table>  <script>
     let prevEnd = null;
+    let prevStart = null;
     let total7Days = [];
     let dayCount = 0;
 
@@ -67,8 +68,18 @@
       const totalDuty = shift1 + shift2 + otTotal;
       const tet = (s2e !== null ? hourDiff(s1s, s2e) : shift1);
 
-      let offDuty = prevEnd !== null ? hourDiff(prevEnd, s1s < prevEnd ? s1s + 1440 : s1s) : 24;
+      let offDuty = 24;
+      if (prevEnd !== null && s1s !== null) {
+        offDuty = hourDiff(prevEnd, s1s);
+      }
+
+      // Only count as new day if off-duty >= 8 hours
+      if (prevEnd === null || offDuty >= 8) {
+        dayCount++;
+      }
+
       prevEnd = s2e || s1e;
+      prevStart = s1s;
 
       total7Days.push(totalDuty);
       if (total7Days.length > 7) total7Days.shift();
@@ -83,7 +94,7 @@
 
       const row = document.createElement("tr");
       row.innerHTML = `
-        <td>${++dayCount}</td>
+        <td>${dayCount}</td>
         <td>${shift1.toFixed(2)}</td>
         <td>${shift2.toFixed(2)}</td>
         <td>${split.toFixed(2)}</td>
