@@ -24,7 +24,7 @@
       text-align: center;
     }
     th { background-color: #ddd; }
-    input[type="time"], input[type="number"] {
+    input[type="text"], input[type="number"] {
       width: 120px;
       background-color: #fff;
       color: #000;
@@ -62,21 +62,21 @@
         <th>Overtime (Before / Between / After)</th>
         <th>Total Duty Hours</th>
         <th>Off-Duty After Shift 2</th>
-        <th>TET (Max 16h)</th>
+        <th>TET</th>
         <th>Warnings</th>
       </tr>
     </thead>
     <tbody id="logTable"></tbody>
   </table>  <div id="inputSection">
-    <h3>Enter Times for Day <span id="currentDay">1</span></h3><label>Shift 1 Start:</label>
-<input type="time" id="shift1Start">
-<label>Shift 1 End:</label>
-<input type="time" id="shift1End"><br><br>
+    <h3>Enter Times for Day <span id="currentDay">1</span></h3><label>Shift 1 Start (e.g. 0900):</label>
+<input type="text" id="shift1Start">
+<label>Shift 1 End (e.g. 1300 or 2700):</label>
+<input type="text" id="shift1End"><br><br>
 
-<label>Shift 2 Start:</label>
-<input type="time" id="shift2Start">
+<label>Shift 2 Start (optional):</label>
+<input type="text" id="shift2Start">
 <label>Shift 2 End:</label>
-<input type="time" id="shift2End"><br><br>
+<input type="text" id="shift2End"><br><br>
 
 <label>Overtime Before Shift 1 (hrs):</label>
 <input type="number" id="otBefore" min="0" step="0.1">
@@ -95,11 +95,16 @@
     let currentDay = 1;
     let prevShift2End = null;
 
-    function timeDiff(start, end) {
-      const [sh, sm] = start.split(":").map(Number);
-      const [eh, em] = end.split(":").map(Number);
-      let diff = (eh * 60 + em) - (sh * 60 + sm);
-      if (diff < 0) diff += 1440;
+    function parseMilitaryTime(str) {
+      const time = parseInt(str, 10);
+      const h = Math.floor(time / 100);
+      const m = time % 100;
+      return h * 60 + m;
+    }
+
+    function hoursBetween(start, end) {
+      let diff = parseMilitaryTime(end) - parseMilitaryTime(start);
+      if (diff < 0) diff += 2400 * 60 / 100;
       return diff / 60;
     }
 
@@ -108,29 +113,38 @@
       const s1e = document.getElementById('shift1End').value;
       const s2s = document.getElementById('shift2Start').value;
       const s2e = document.getElementById('shift2End').value;
+
       const otBefore = parseFloat(document.getElementById('otBefore').value || 0);
       const otBetween = parseFloat(document.getElementById('otBetween').value || 0);
       const otAfter = parseFloat(document.getElementById('otAfter').value || 0);
 
-      if (!s1s || !s1e || !s2s || !s2e) {
-        document.getElementById('warning').innerText = 'Please enter all shift times.';
+      if (!s1s || !s1e) {
+        document.getElementById('warning').innerText = 'Please enter Shift 1 times.';
         return;
       }
 
-      const shift1Hrs = timeDiff(s1s, s1e);
-      const shift2Hrs = timeDiff(s2s, s2e);
-      const split = timeDiff(s1e, s2s);
+      const shift1Hrs = hoursBetween(s1s, s1e);
+      let shift2Hrs = 0, split = 0, shift2Str = '';
+
+      if (s2s && s2e) {
+        shift2Hrs = hoursBetween(s2s, s2e);
+        split = hoursBetween(s1e, s2s);
+        shift2Str = `${s2s}–${s2e}`;
+      } else {
+        shift2Str = '-';
+      }
+
       const totalOT = otBefore + otBetween + otAfter;
       const dutyHours = shift1Hrs + shift2Hrs + totalOT;
       let offDuty = 0;
 
       if (prevShift2End) {
-        offDuty = timeDiff(prevShift2End, s1s);
+        offDuty = hoursBetween(prevShift2End, s1s);
       }
 
-      const TET = shift1Hrs + split + shift2Hrs;
-      let warning = '';
+      const TET = s2s ? (shift1Hrs + split + shift2Hrs) : shift1Hrs;
 
+      let warning = '';
       if (shift1Hrs > 13) warning += 'Shift 1 exceeds 13h. ';
       if (shift2Hrs > 13) warning += 'Shift 2 exceeds 13h. ';
       if (dutyHours > 14) warning += 'Duty exceeds 14h/day. ';
@@ -140,16 +154,16 @@
       logs.push({
         day: currentDay,
         shift1: `${s1s}–${s1e}`,
-        shift2: `${s2s}–${s2e}`,
+        shift2: shift2Str,
         split: split.toFixed(2),
-        overtime: `${otBefore + otBetween + otAfter}h`,
+        overtime: `${totalOT.toFixed(2)}h`,
         total: dutyHours.toFixed(2),
         offDuty: offDuty.toFixed(2),
         TET: TET.toFixed(2),
         warning
       });
 
-      prevShift2End = s2e;
+      prevShift2End = s2e || s1e;
       currentDay++;
       updateTable();
 
