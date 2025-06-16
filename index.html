@@ -29,4 +29,38 @@
     const weeklyOnDuty = Array(7).fill(0);
     function calculate() {
       const day = parseInt(document.getElementById('day').value) - 1;
-     
+      const drive = parseFloat(document.getElementById('driving').value);
+      const duty = parseFloat(document.getElementById('onduty').value);
+      const off = parseFloat(document.getElementById('offduty').value);
+
+      const warning = document.getElementById('warning');
+      const summary = document.getElementById('summary');
+      warning.innerHTML = '';
+      summary.innerHTML = '';
+
+      if (isNaN(day) || isNaN(drive) || isNaN(duty) || isNaN(off) || day < 0 || day > 6) {
+        warning.innerText = 'Please fill out all fields correctly (Day 1–7)';
+        return;
+      }
+
+      const totalDuty = drive + duty;
+      const TET = totalDuty + off;
+
+      weeklyOnDuty[day] = totalDuty;
+      const cumulative7 = weeklyOnDuty.reduce((a, b) => a + b, 0);
+
+      let messages = [];
+      if (drive > 14) messages.push('Driving time exceeds 14-hour daily max.');
+      if (totalDuty > 14) messages.push('On-duty time exceeds 14-hour daily max.');
+      if (TET > 16) messages.push('Total Elapsed Time exceeds 16-hour limit.');
+      if (off < 8) messages.push('Minimum 8 hours off-duty not met.');
+      if (cumulative7 > 70) messages.push('Over 70 hours on-duty in 7 days – RESET REQUIRED.');
+
+      if (messages.length > 0) {
+        warning.innerHTML = messages.join('<br>');
+      } else {
+        summary.innerHTML = `✅ All checks passed for Day ${day + 1}.<br>Total on-duty hours this week: ${cumulative7.toFixed(1)} hours.`;
+      }
+    }
+  </script></body>
+</html>
