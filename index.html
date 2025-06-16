@@ -93,7 +93,8 @@
   <div class="summary" id="summary"></div>  <script>
     const logs = [];
     let currentDay = 1;
-    let prevShift2End = null;
+    let prevEnd = null;
+    let prevEndMinutes = null;
 
     function parseMilitaryTime(str) {
       const time = parseInt(str, 10);
@@ -103,9 +104,10 @@
     }
 
     function hoursBetween(start, end) {
-      let diff = parseMilitaryTime(end) - parseMilitaryTime(start);
-      if (diff < 0) diff += 2400 * 60 / 100;
-      return diff / 60;
+      let startMin = parseMilitaryTime(start);
+      let endMin = parseMilitaryTime(end);
+      if (endMin < startMin) endMin += 2400 * 60 / 100;
+      return (endMin - startMin) / 60;
     }
 
     function calculateDay() {
@@ -124,57 +126,56 @@
       }
 
       const shift1Hrs = hoursBetween(s1s, s1e);
-      let shift2Hrs = 0, split = 0, shift2Str = '';
+      let shift2Hrs = 0, split = 0, shift2Str = '-';
 
       if (s2s && s2e) {
         shift2Hrs = hoursBetween(s2s, s2e);
         split = hoursBetween(s1e, s2s);
         shift2Str = `${s2s}–${s2e}`;
-      } else {
-        shift2Str = '-';
       }
 
       const totalOT = otBefore + otBetween + otAfter;
       const dutyHours = shift1Hrs + shift2Hrs + totalOT;
-      let offDuty = 0;
-
-      if (prevShift2End) {
-        offDuty = hoursBetween(prevShift2End, s1s);
-      }
-
       const TET = s2s ? (shift1Hrs + split + shift2Hrs) : shift1Hrs;
 
-      let warning = '';
-      if (shift1Hrs > 13) warning += 'Shift 1 exceeds 13h. ';
-      if (shift2Hrs > 13) warning += 'Shift 2 exceeds 13h. ';
-      if (dutyHours > 14) warning += 'Duty exceeds 14h/day. ';
-      if (TET > 16) warning += 'TET exceeds 16h. ';
-      if (offDuty && offDuty < 8) warning += 'Off-duty < 8h. ';
+      let offDuty = 0;
+      let validDay = true;
+      if (prevEndMinutes !== null) {
+        const currStartMinutes = parseMilitaryTime(s1s);
+        offDuty = (currStartMinutes + (currStartMinutes < prevEndMinutes ? 1440 : 0) - prevEndMinutes) / 60;
+        if (offDuty >= 8) {
+          currentDay++;
+        } else {
+          validDay = true;
+        }
+      }
+
+      const warnings = [];
+      if (shift1Hrs > 13) warnings.push('Shift 1 > 13h');
+      if (shift2Hrs > 13) warnings.push('Shift 2 > 13h');
+      if (dutyHours > 14) warnings.push('Duty > 14h');
+      if (TET > 16) warnings.push('TET > 16h');
+      if (prevEndMinutes !== null && offDuty < 8) warnings.push('Off-duty < 8h');
 
       logs.push({
         day: currentDay,
         shift1: `${s1s}–${s1e}`,
         shift2: shift2Str,
         split: split.toFixed(2),
-        overtime: `${totalOT.toFixed(2)}h`,
+        overtime: totalOT.toFixed(2),
         total: dutyHours.toFixed(2),
         offDuty: offDuty.toFixed(2),
         TET: TET.toFixed(2),
-        warning
+        warning: warnings.join(', ')
       });
 
-      prevShift2End = s2e || s1e;
-      currentDay++;
-      updateTable();
+      prevEnd = s2e || s1e;
+      prevEndMinutes = parseMilitaryTime(prevEnd);
 
-      if (currentDay > 14) {
-        document.getElementById('inputSection').style.display = 'none';
-        document.getElementById('warning').innerText = 'All 14 days entered.';
-      } else {
-        document.getElementById('currentDay').innerText = currentDay;
-        document.querySelectorAll('input').forEach(i => i.value = '');
-        document.getElementById('warning').innerText = '';
-      }
+      document.getElementById('currentDay').innerText = currentDay + 1;
+      updateTable();
+      document.querySelectorAll('input').forEach(i => i.value = '');
+      document.getElementById('warning').innerText = '';
     }
 
     function updateTable() {
@@ -216,7 +217,8 @@
     function resetLog() {
       logs.length = 0;
       currentDay = 1;
-      prevShift2End = null;
+      prevEnd = null;
+      prevEndMinutes = null;
       document.getElementById('currentDay').innerText = currentDay;
       document.getElementById('inputSection').style.display = 'block';
       updateTable();
