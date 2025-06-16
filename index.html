@@ -1,229 +1,134 @@
 <!DOCTYPE html><html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NSC Hours Calculator</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NSC Compliance Checker</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
-      background: #f5f5f5;
-      color: #000;
+      background: #f0f0f0;
     }
-    h2, h3 { text-align: center; color: #000; }
+    h1 {
+      color: #333;
+    }
+    input, select, button {
+      margin: 5px 0;
+      padding: 8px;
+      width: 100%;
+      box-sizing: border-box;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 20px;
-      background-color: #fff;
-      color: #000;
     }
     th, td {
-      border: 1px solid #000;
+      border: 1px solid #ccc;
       padding: 8px;
       text-align: center;
     }
-    th { background-color: #ddd; }
-    input[type="text"], input[type="number"] {
-      width: 120px;
-      background-color: #fff;
-      color: #000;
-      border: 1px solid #ccc;
-    }
-    button {
-      padding: 10px;
-      margin-top: 15px;
-      width: 100%;
-      background-color: #333;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      font-weight: bold;
-    }
-    .warning { color: red; font-weight: bold; margin-top: 10px; }
-    .summary {
-      margin-top: 20px;
-      padding: 10px;
-      background: #fff;
-      color: #000;
-      border: 1px solid #ccc;
-      border-radius: 5px;
+    th {
+      background-color: #eee;
     }
   </style>
 </head>
 <body>
-  <h2>NSC Hours-of-Service Calculator</h2>  <table>
-    <thead>
-      <tr>
-        <th>Day</th>
-        <th>Shift 1</th>
-        <th>Shift 2</th>
-        <th>Split (Non-working)</th>
-        <th>Overtime (Before / Between / After)</th>
-        <th>Total Duty Hours</th>
-        <th>Off-Duty After Shift 2</th>
-        <th>TET</th>
-        <th>Warnings</th>
-      </tr>
-    </thead>
-    <tbody id="logTable"></tbody>
-  </table>  <div id="inputSection">
-    <h3>Enter Times for Day <span id="currentDay">1</span></h3><label>Shift 1 Start (e.g. 0900):</label>
-<input type="text" id="shift1Start">
-<label>Shift 1 End (e.g. 1300 or 2700):</label>
-<input type="text" id="shift1End"><br><br>
+  <h1>NSC Duty Hours Compliance Checker</h1>  <form id="dayForm">
+    <label for="s1s">Shift 1 Start (24h):</label>
+    <input type="time" id="s1s" name="s1s" required /><label for="s1e">Shift 1 End (24h):</label>
+<input type="time" id="s1e" name="s1e" required />
 
-<label>Shift 2 Start (optional):</label>
-<input type="text" id="shift2Start">
-<label>Shift 2 End:</label>
-<input type="text" id="shift2End"><br><br>
+<label for="s2s">Shift 2 Start (optional):</label>
+<input type="time" id="s2s" name="s2s" />
 
-<label>Overtime Before Shift 1 (hrs):</label>
-<input type="number" id="otBefore" min="0" step="0.1">
-<label>Between Shifts:</label>
-<input type="number" id="otBetween" min="0" step="0.1">
-<label>After Shift 2:</label>
-<input type="number" id="otAfter" min="0" step="0.1"><br><br>
+<label for="s2e">Shift 2 End (optional):</label>
+<input type="time" id="s2e" name="s2e" />
 
-<button onclick="calculateDay()">Submit Day</button>
+<label for="ots">Overtime Start (optional):</label>
+<input type="time" id="ots" name="ots" />
 
-  </div><button onclick="resetLog()">Reset Log</button>
+<label for="ote">Overtime End (optional):</label>
+<input type="time" id="ote" name="ote" />
 
-  <div class="warning" id="warning"></div>
-  <div class="summary" id="summary"></div>  <script>
-    const logs = [];
-    let currentDay = 1;
-    let prevEnd = null;
+<button type="submit">Submit Day</button>
+
+  </form>  <div id="output"></div>  <script>
+    const form = document.getElementById('dayForm');
+    const output = document.getElementById('output');
     let prevEndMinutes = null;
+    let total7DayHours = 0;
+    let dayCount = 0;
 
-    function parseMilitaryTime(str) {
-      const time = parseInt(str, 10);
-      const h = Math.floor(time / 100);
-      const m = time % 100;
+    function parseMilitaryTime(timeStr) {
+      if (!timeStr) return null;
+      const [h, m] = timeStr.split(":").map(Number);
       return h * 60 + m;
     }
 
-    function hoursBetween(start, end) {
-      let startMin = parseMilitaryTime(start);
-      let endMin = parseMilitaryTime(end);
-      if (endMin < startMin) endMin += 2400 * 60 / 100;
-      return (endMin - startMin) / 60;
-    }
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const s1s = form.s1s.value;
+      const s1e = form.s1e.value;
+      const s2s = form.s2s.value;
+      const s2e = form.s2e.value;
+      const ots = form.ots.value;
+      const ote = form.ote.value;
 
-    function calculateDay() {
-      const s1s = document.getElementById('shift1Start').value;
-      const s1e = document.getElementById('shift1End').value;
-      const s2s = document.getElementById('shift2Start').value;
-      const s2e = document.getElementById('shift2End').value;
+      const s1Start = parseMilitaryTime(s1s);
+      let s1End = parseMilitaryTime(s1e);
+      if (s1End < s1Start) s1End += 1440;
+      const shift1 = (s1End - s1Start) / 60;
 
-      const otBefore = parseFloat(document.getElementById('otBefore').value || 0);
-      const otBetween = parseFloat(document.getElementById('otBetween').value || 0);
-      const otAfter = parseFloat(document.getElementById('otAfter').value || 0);
-
-      if (!s1s || !s1e) {
-        document.getElementById('warning').innerText = 'Please enter Shift 1 times.';
-        return;
+      let shift2 = 0;
+      let s2Start = parseMilitaryTime(s2s);
+      let s2End = parseMilitaryTime(s2e);
+      if (s2Start !== null && s2End !== null) {
+        if (s2End < s2Start) s2End += 1440;
+        shift2 = (s2End - s2Start) / 60;
       }
 
-      const shift1Hrs = hoursBetween(s1s, s1e);
-      let shift2Hrs = 0, split = 0, shift2Str = '-';
-
-      if (s2s && s2e) {
-        shift2Hrs = hoursBetween(s2s, s2e);
-        split = hoursBetween(s1e, s2s);
-        shift2Str = `${s2s}–${s2e}`;
+      let splitHours = 0;
+      if (s2Start !== null) {
+        if (s2Start < s1End) s2Start += 1440;
+        splitHours = (s2Start - s1End) / 60;
       }
 
-      const totalOT = otBefore + otBetween + otAfter;
-      const dutyHours = shift1Hrs + shift2Hrs + totalOT;
-      const TET = s2s ? (shift1Hrs + split + shift2Hrs) : shift1Hrs;
+      let otHours = 0;
+      let otStart = parseMilitaryTime(ots);
+      let otEnd = parseMilitaryTime(ote);
+      if (otStart !== null && otEnd !== null) {
+        if (otEnd < otStart) otEnd += 1440;
+        otHours = (otEnd - otStart) / 60;
+      }
+
+      const totalDuty = shift1 + shift2 + otHours;
+      const tet = shift2 ? (s2End - s1Start) / 60 : shift1;
 
       let offDuty = 0;
-      let validDay = true;
       if (prevEndMinutes !== null) {
-        const currStartMinutes = parseMilitaryTime(s1s);
-        offDuty = (currStartMinutes + (currStartMinutes < prevEndMinutes ? 1440 : 0) - prevEndMinutes) / 60;
-        if (offDuty >= 8) {
-          currentDay++;
-        } else {
-          validDay = true;
-        }
+        const currStartMinutes = s1Start < prevEndMinutes ? s1Start + 1440 : s1Start;
+        offDuty = (currStartMinutes - prevEndMinutes) / 60;
       }
+      prevEndMinutes = s2End || s1End;
 
-      const warnings = [];
-      if (shift1Hrs > 13) warnings.push('Shift 1 > 13h');
-      if (shift2Hrs > 13) warnings.push('Shift 2 > 13h');
-      if (dutyHours > 14) warnings.push('Duty > 14h');
-      if (TET > 16) warnings.push('TET > 16h');
-      if (prevEndMinutes !== null && offDuty < 8) warnings.push('Off-duty < 8h');
+      const violations = [];
+      if (shift1 + shift2 > 14) violations.push("More than 14 on-duty hours");
+      if (shift1 + shift2 > 13) violations.push("More than 13 driving hours");
+      if (tet > 16) violations.push("More than 16 hours TET");
+      if (offDuty < 8) violations.push("Less than 8 consecutive hours off-duty before start");
+      total7DayHours += shift1 + shift2;
+      if (++dayCount > 6 && total7DayHours > 70) violations.push("More than 70 on-duty hours in 7 days");
 
-      logs.push({
-        day: currentDay,
-        shift1: `${s1s}–${s1e}`,
-        shift2: shift2Str,
-        split: split.toFixed(2),
-        overtime: totalOT.toFixed(2),
-        total: dutyHours.toFixed(2),
-        offDuty: offDuty.toFixed(2),
-        TET: TET.toFixed(2),
-        warning: warnings.join(', ')
-      });
-
-      prevEnd = s2e || s1e;
-      prevEndMinutes = parseMilitaryTime(prevEnd);
-
-      document.getElementById('currentDay').innerText = currentDay + 1;
-      updateTable();
-      document.querySelectorAll('input').forEach(i => i.value = '');
-      document.getElementById('warning').innerText = '';
-    }
-
-    function updateTable() {
-      const tbody = document.getElementById('logTable');
-      tbody.innerHTML = '';
-      let week1 = 0, week2 = 0, has24hrOff = false;
-
-      logs.forEach((log, i) => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${log.day}</td>
-          <td>${log.shift1}</td>
-          <td>${log.shift2}</td>
-          <td>${log.split}</td>
-          <td>${log.overtime}</td>
-          <td>${log.total}</td>
-          <td>${log.offDuty}</td>
-          <td>${log.TET}</td>
-          <td class="warning">${log.warning}</td>
-        `;
-        tbody.appendChild(row);
-
-        const duty = parseFloat(log.total);
-        if (i < 7) week1 += duty;
-        else week2 += duty;
-
-        if (parseFloat(log.offDuty) >= 24) has24hrOff = true;
-      });
-
-      const summary = document.getElementById('summary');
-      summary.innerHTML = `
-        Week 1 On-Duty Total: ${week1.toFixed(1)}h<br>
-        Week 2 On-Duty Total: ${week2.toFixed(1)}h<br>
-        ${week1 > 70 || week2 > 70 ? '<span class="warning">Reset required: over 70h on-duty in a 7-day period.</span><br>' : ''}
-        ${has24hrOff ? '✅ 24h consecutive off-duty taken in 14 days.' : '<span class="warning">❌ 24h off-duty in 14 days NOT taken.</span>'}
+      const row = `
+        <table>
+          <tr><th>Day</th><th>Shift 1 (hrs)</th><th>Shift 2 (hrs)</th><th>Split (hrs)</th><th>OT (hrs)</th><th>Total Duty (hrs)</th><th>TET (hrs)</th><th>Off-duty (hrs)</th><th>Violations</th></tr>
+          <tr><td>${dayCount}</td><td>${shift1}</td><td>${shift2}</td><td>${splitHours}</td><td>${otHours}</td><td>${totalDuty}</td><td>${tet}</td><td>${offDuty.toFixed(2)}</td><td>${violations.join(", ") || "None"}</td></tr>
+        </table>
       `;
-    }
 
-    function resetLog() {
-      logs.length = 0;
-      currentDay = 1;
-      prevEnd = null;
-      prevEndMinutes = null;
-      document.getElementById('currentDay').innerText = currentDay;
-      document.getElementById('inputSection').style.display = 'block';
-      updateTable();
-      document.getElementById('summary').innerHTML = '';
-      document.getElementById('warning').innerHTML = '';
-    }
+      output.innerHTML = row + output.innerHTML;
+      form.reset();
+    });
   </script></body>
 </html>
