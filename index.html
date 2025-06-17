@@ -3,64 +3,141 @@
 <head>
   <meta charset="UTF-8">
   <title>NSC Service Hours Calculator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
-    body { font-family: Arial; padding: 20px; background: #f2f2f2; }
-    table { border-collapse: collapse; width: 100%; background: white; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
-    input { margin-bottom: 5px; }
-    label { display: block; margin-top: 10px; font-weight: bold; }
-    .form-row { margin-bottom: 10px; }
-    button { margin-top: 10px; }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f0f2f5;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    label {
+      font-weight: bold;
+      display: block;
+      margin-top: 10px;
+    }
+    input {
+      width: 100%;
+      padding: 6px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+    }
+    button {
+      margin-top: 15px;
+      padding: 10px 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    table {
+      margin-top: 20px;
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 6px;
+      text-align: center;
+      font-size: 0.9em;
+    }
+    th {
+      background-color: #007bff;
+      color: white;
+      position: sticky;
+      top: 0;
+    }
+    @media print {
+      button {
+        display: none;
+      }
+    }
   </style>
 </head>
 <body>
-  <h2>NSC Service Hours Calculator</h2>
+  <div class="container">
+    <h2>NSC Service Hours Calculator</h2>
 
-  <label for="date">Date:</label>
-  <input type="date" id="date"><br>
+    <div class="form-grid">
+      <div>
+        <label for="date">Date:</label>
+        <input type="date" id="date">
+      </div>
+      <div>
+        <label>Shift 1 Start (e.g., 0500):</label>
+        <input type="text" id="shift1Start">
+      </div>
+      <div>
+        <label>Shift 1 End (e.g., 1300):</label>
+        <input type="text" id="shift1End">
+      </div>
+      <div>
+        <label>Shift 2 Start (optional):</label>
+        <input type="text" id="shift2Start">
+      </div>
+      <div>
+        <label>Shift 2 End (optional):</label>
+        <input type="text" id="shift2End">
+      </div>
+      <div>
+        <label>Overtime Before Shift 1:</label>
+        <input type="text" id="otBefore">
+      </div>
+      <div>
+        <label>Overtime Between Shifts:</label>
+        <input type="text" id="otBetween">
+      </div>
+      <div>
+        <label>Overtime After Shift 2:</label>
+        <input type="text" id="otAfter">
+      </div>
+    </div>
 
-  <label>Shift 1 Start (e.g., 0500):</label>
-  <input type="text" id="shift1Start"><br>
+    <button onclick="submitDay()">Submit Day</button>
+    <button onclick="downloadPDF()">Download PDF</button>
 
-  <label>Shift 1 End (e.g., 1300):</label>
-  <input type="text" id="shift1End"><br>
-
-  <label>Shift 2 Start (optional):</label>
-  <input type="text" id="shift2Start"><br>
-
-  <label>Shift 2 End (optional):</label>
-  <input type="text" id="shift2End"><br>
-
-  <label>Overtime Before Shift 1 (optional):</label>
-  <input type="text" id="otBefore"><br>
-
-  <label>Overtime Between Shifts (optional):</label>
-  <input type="text" id="otBetween"><br>
-
-  <label>Overtime After Shift 2 (optional):</label>
-  <input type="text" id="otAfter"><br>
-
-  <button onclick="submitDay()">Submit Day</button>
-
-  <table id="results">
-    <thead>
-      <tr>
-        <th>Day</th>
-        <th>Date</th>
-        <th>Shift 1</th>
-        <th>Shift 2</th>
-        <th>Split Hours</th>
-        <th>Overtime (Before / Between / After)</th>
-        <th>Total Duty</th>
-        <th>Cumulative Duty</th>
-        <th>TET (Start to End)</th>
-        <th>Off-Duty</th>
-        <th>NSC Violation</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+    <table id="results">
+      <thead>
+        <tr>
+          <th>Day</th>
+          <th>Date</th>
+          <th>Shift 1</th>
+          <th>Shift 2</th>
+          <th>Split Hours</th>
+          <th>OT (B/Btwn/A)</th>
+          <th>Total Duty</th>
+          <th>Cumulative Duty</th>
+          <th>TET</th>
+          <th>Off-Duty</th>
+          <th>Violation</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
 
   <script>
     const entries = [];
@@ -187,14 +264,38 @@
     }
 
     function clearInputs() {
-      document.getElementById("date").value = "";
-      document.getElementById("shift1Start").value = "";
-      document.getElementById("shift1End").value = "";
-      document.getElementById("shift2Start").value = "";
-      document.getElementById("shift2End").value = "";
-      document.getElementById("otBefore").value = "";
-      document.getElementById("otBetween").value = "";
-      document.getElementById("otAfter").value = "";
+      document.querySelectorAll("input").forEach(i => i.value = "");
+    }
+
+    function downloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.setFontSize(12);
+      doc.text("NSC Service Hours Report", 14, 14);
+
+      let y = 20;
+      entries.forEach((e, i) => {
+        const lines = [
+          `Day ${e.dayNumber} (${e.date})`,
+          `Shift 1: ${e.shift1}`,
+          `Shift 2: ${e.shift2}`,
+          `OT: ${e.overtime}`,
+          `Total Duty: ${e.totalDuty}, TET: ${e.TETRange}`,
+          `Split Hours: ${e.splitHours}, Off-Duty: ${e.offDuty}`,
+          `Cumulative: ${e.cumulativeDuty}h, Violation: ${e.violation}`
+        ];
+        lines.forEach(line => {
+          doc.text(line, 14, y);
+          y += 6;
+        });
+        y += 4;
+        if (y > 270) {
+          doc.addPage();
+          y = 20;
+        }
+      });
+
+      doc.save("nsc_hours_report.pdf");
     }
   </script>
 </body>
