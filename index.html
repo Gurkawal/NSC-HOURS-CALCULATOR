@@ -1,34 +1,105 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>NSC Hours Tracker</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    body { font-family: 'Segoe UI', sans-serif; background: #f1f3f5; margin: 0; padding: 10px; }
-    .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
-    h2 { text-align: center; color: #0056b3; margin-bottom: 20px; }
-    label { display: block; margin-top: 12px; font-weight: 500; }
-    input, select { width: 100%; padding: 8px; margin-top: 5px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; }
-    .section { margin-bottom: 20px; }
-    .group { display: flex; gap: 10px; flex-wrap: wrap; }
-    .group > div { flex: 1 1 48%; }
-    .buttons { display: flex; justify-content: space-between; position: sticky; bottom: 0; background: white; padding: 10px 0 0; border-top: 1px solid #ddd; margin-top: 20px; }
-    button { background: #007bff; color: white; border: none; padding: 10px 16px; border-radius: 5px; font-size: 16px; cursor: pointer; }
-    button:hover { background: #0056b3; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
-    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
-    th { background: #007bff; color: white; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f1f3f5;
+      margin: 0;
+      padding: 10px;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    h2 {
+      text-align: center;
+      color: #0056b3;
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-top: 12px;
+      font-weight: 500;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .group > div {
+      flex: 1 1 48%;
+    }
+    .buttons {
+      display: flex;
+      justify-content: space-between;
+      position: sticky;
+      bottom: 0;
+      background: white;
+      padding: 10px 0 0;
+      border-top: 1px solid #ddd;
+      margin-top: 20px;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      text-align: center;
+    }
+    th {
+      background: #007bff;
+      color: white;
+    }
     @media (max-width: 600px) {
-      .group > div { flex: 1 1 100%; }
-      table { font-size: 12px; }
+      .group > div {
+        flex: 1 1 100%;
+      }
+      table {
+        font-size: 12px;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>NSC Service Hours Tracker</h2>
+
     <div class="section">
       <label for="cycle">Select Cycle</label>
       <select id="cycle">
@@ -36,9 +107,14 @@
         <option value="2">Cycle 2 (120hr / 14 days, 13 max working days)</option>
       </select>
     </div>
+
     <div class="section group">
-      <div><label for="date">Date</label><input type="date" id="date"></div>
+      <div>
+        <label for="date">Date</label>
+        <input type="date" id="date">
+      </div>
     </div>
+
     <div class="section">
       <strong>Shift 1</strong>
       <div class="group">
@@ -46,6 +122,7 @@
         <div><label>End Time</label><input type="text" id="shift1End" placeholder="e.g., 1230"></div>
       </div>
     </div>
+
     <div class="section">
       <strong>Shift 2 (Optional)</strong>
       <div class="group">
@@ -53,6 +130,7 @@
         <div><label>End Time</label><input type="text" id="shift2End" placeholder="e.g., 1900"></div>
       </div>
     </div>
+
     <div class="section">
       <strong>Overtime</strong>
       <div class="group">
@@ -61,10 +139,12 @@
         <div><label>After Shift 2</label><input type="text" id="otAfterTime" placeholder="1900 to 2000"></div>
       </div>
     </div>
+
     <div class="buttons">
       <button onclick="submitDay()">Submit Day</button>
       <button onclick="downloadPDF()">Download PDF</button>
     </div>
+
     <table id="results">
       <thead>
         <tr>
@@ -89,18 +169,19 @@
     const entries = [];
 
     function parseTime(str) {
-      str = str.trim();
-      if (!/^\d{3,4}$/.test(str)) return null;
-      let padded = str.padStart(4, '0');
-      const hour = parseInt(padded.slice(0, 2));
-      const min = parseInt(padded.slice(2));
+      if (!str || str.length < 3) return null;
+      str = str.padStart(4, '0');
+      const hour = parseInt(str.slice(0, 2), 10);
+      const min = parseInt(str.slice(2), 10);
       if (isNaN(hour) || isNaN(min) || hour > 23 || min > 59) return null;
       return hour + min / 60;
     }
 
     function timeDiff(start, end) {
       if (start == null || end == null) return 0;
-      return (end - start + 24) % 24;
+      let diff = (end - start + 24) % 24;
+      if (diff === 0 && end !== start) diff = 24; // overnight full shift
+      return diff;
     }
 
     function parseOT(str) {
@@ -148,8 +229,6 @@
 
     function submitDay() {
       const date = document.getElementById("date").value;
-      if (!date) return alert("Please select a date.");
-
       const shift1Start = parseTime(document.getElementById("shift1Start").value);
       const shift1End = parseTime(document.getElementById("shift1End").value);
       const shift2Start = parseTime(document.getElementById("shift2Start").value);
@@ -159,14 +238,17 @@
       const otAfter = parseOT(document.getElementById("otAfterTime").value);
       const cycle = document.getElementById("cycle").value;
 
-      if (shift1Start == null || shift1End == null) return alert("Shift 1 times are invalid.");
+      if (!date || shift1Start == null || shift1End == null) {
+        alert("Please enter a valid date and Shift 1 times.");
+        return;
+      }
 
       const shift1Hours = timeDiff(shift1Start, shift1End);
-      const shift2Hours = (shift2Start != null && shift2End != null) ? timeDiff(shift2Start, shift2End) : 0;
+      const shift2Hours = shift2Start != null && shift2End != null ? timeDiff(shift2Start, shift2End) : 0;
       const totalDuty = shift1Hours + shift2Hours + otBefore + otBetween + otAfter;
-      const tet = (shift2End != null) ? timeDiff(shift1Start, shift2End) : shift1Hours;
+      const tet = shift2End ? timeDiff(shift1Start, shift2End) : shift1Hours;
       const offDuty = 24 - tet;
-      const cumulative = (cycle === "1") ? getCumulative(7) + totalDuty : getCumulative(14) + totalDuty;
+      const cumulative = cycle === "1" ? getCumulative(7) + totalDuty : getCumulative(14) + totalDuty;
 
       let violation = "";
       if (totalDuty > 14 || tet > 16) violation = "Duty Limit";
