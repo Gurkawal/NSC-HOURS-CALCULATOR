@@ -6,56 +6,59 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Segoe UI', sans-serif;
+      background: #f4f6f9;
+      margin: 0;
       padding: 20px;
-      background: #f0f2f5;
+    }
+    .container {
+      max-width: 1100px;
+      margin: auto;
+      background: #fff;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.07);
     }
     h2 {
       text-align: center;
-      margin-bottom: 20px;
-    }
-    .container {
-      max-width: 900px;
-      margin: auto;
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-    label {
-      font-weight: bold;
-      display: block;
-      margin-top: 10px;
-    }
-    input {
-      width: 100%;
-      padding: 6px;
-      margin-top: 5px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+      color: #007bff;
     }
     .form-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 15px;
+    }
+    label {
+      font-weight: 600;
+      margin-top: 10px;
+      display: block;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
     }
     button {
-      margin-top: 15px;
-      padding: 10px 16px;
+      padding: 10px 18px;
       background-color: #007bff;
       color: white;
       border: none;
       border-radius: 6px;
       cursor: pointer;
+      margin: 10px 5px 0 0;
     }
     button:hover {
       background-color: #0056b3;
     }
+    .button-group {
+      text-align: right;
+    }
     table {
-      margin-top: 20px;
       width: 100%;
+      margin-top: 25px;
       border-collapse: collapse;
-      background: #fff;
     }
     th, td {
       border: 1px solid #ddd;
@@ -66,13 +69,12 @@
     th {
       background-color: #007bff;
       color: white;
-      position: sticky;
-      top: 0;
     }
-    @media print {
-      button {
-        display: none;
-      }
+    .cycle-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
     }
   </style>
 </head>
@@ -80,43 +82,29 @@
   <div class="container">
     <h2>NSC Service Hours Calculator</h2>
 
-    <div class="form-grid">
-      <div>
-        <label for="date">Date:</label>
-        <input type="date" id="date">
-      </div>
-      <div>
-        <label>Shift 1 Start (e.g., 0500):</label>
-        <input type="text" id="shift1Start">
-      </div>
-      <div>
-        <label>Shift 1 End (e.g., 1300):</label>
-        <input type="text" id="shift1End">
-      </div>
-      <div>
-        <label>Shift 2 Start (optional):</label>
-        <input type="text" id="shift2Start">
-      </div>
-      <div>
-        <label>Shift 2 End (optional):</label>
-        <input type="text" id="shift2End">
-      </div>
-      <div>
-        <label>Overtime Before Shift 1:</label>
-        <input type="text" id="otBefore">
-      </div>
-      <div>
-        <label>Overtime Between Shifts:</label>
-        <input type="text" id="otBetween">
-      </div>
-      <div>
-        <label>Overtime After Shift 2:</label>
-        <input type="text" id="otAfter">
-      </div>
+    <div class="cycle-toggle">
+      <label><b>Select Cycle:</b></label>
+      <select id="cycle">
+        <option value="1">Cycle 1 (70hr/7 days)</option>
+        <option value="2">Cycle 2 (120hr/14 days)</option>
+      </select>
     </div>
 
-    <button onclick="submitDay()">Submit Day</button>
-    <button onclick="downloadPDF()">Download PDF</button>
+    <div class="form-grid">
+      <div><label>Date:</label><input type="date" id="date"></div>
+      <div><label>Shift 1 Start (e.g., 0500):</label><input type="text" id="shift1Start"></div>
+      <div><label>Shift 1 End (e.g., 1300):</label><input type="text" id="shift1End"></div>
+      <div><label>Shift 2 Start (optional):</label><input type="text" id="shift2Start"></div>
+      <div><label>Shift 2 End (optional):</label><input type="text" id="shift2End"></div>
+      <div><label>OT Before Shift 1:</label><input type="text" id="otBefore"></div>
+      <div><label>OT Between Shifts:</label><input type="text" id="otBetween"></div>
+      <div><label>OT After Shift 2:</label><input type="text" id="otAfter"></div>
+    </div>
+
+    <div class="button-group">
+      <button onclick="submitDay()">Submit Day</button>
+      <button onclick="downloadPDF()">Download PDF</button>
+    </div>
 
     <table id="results">
       <thead>
@@ -128,7 +116,7 @@
           <th>Split Hours</th>
           <th>OT (B/Btwn/A)</th>
           <th>Total Duty</th>
-          <th>Cumulative Duty</th>
+          <th>Cumulative</th>
           <th>TET</th>
           <th>Off-Duty</th>
           <th>Violation</th>
@@ -160,7 +148,20 @@
     function formatTimeRange(start, end) {
       if (start == null || end == null) return "-";
       const duration = (end >= start ? end - start : 24 + end - start);
-      return `${formatTime24To12(start)} to ${formatTime24To12(end)} (${duration.toFixed(2)}h)`;
+      return `${formatTime24To12(start)} - ${formatTime24To12(end)} (${duration.toFixed(2)}h)`;
+    }
+
+    function getCumulative(cycleDays) {
+      const today = new Date(entries[entries.length - 1].date);
+      let total = 0;
+      entries.forEach(e => {
+        const entryDate = new Date(e.date);
+        const diff = (today - entryDate) / (1000 * 60 * 60 * 24);
+        if (diff < cycleDays) {
+          total += parseFloat(e.totalDuty);
+        }
+      });
+      return total;
     }
 
     function submitDay() {
@@ -172,15 +173,16 @@
       const otBefore = parseFloat(document.getElementById("otBefore").value) || 0;
       const otBetween = parseFloat(document.getElementById("otBetween").value) || 0;
       const otAfter = parseFloat(document.getElementById("otAfter").value) || 0;
+      const cycle = document.getElementById("cycle").value;
 
       const shift1Duration = (s1Start != null && s1End != null) ? ((s1End - s1Start + 24) % 24) : 0;
       const shift2Duration = (s2Start != null && s2End != null) ? ((s2End - s2Start + 24) % 24) : 0;
       const splitHours = (s1End != null && s2Start != null) ? ((s2Start - s1End + 24) % 24) : 0;
       const totalDuty = shift1Duration + shift2Duration + otBefore + otBetween + otAfter;
       const TET = shift1Duration + shift2Duration;
-      const dayNumber = entries.length + 1;
-      const endTime = s2End != null ? s2End : s1End;
+
       const startTime = s1Start != null ? s1Start : s2Start;
+      const endTime = s2End != null ? s2End : s1End;
 
       let offDuty = 24;
       let violation = "None";
@@ -206,24 +208,25 @@
       if (totalDuty > 14) violation = "Over 14h duty";
       if (TET > 16) violation = "Over 16h TET";
 
-      let cumulativeDuty = totalDuty;
-      if (entries.length > 0) {
-        cumulativeDuty += parseFloat(entries[entries.length - 1].cumulativeDuty);
-      }
+      const cycleLimit = cycle === "1" ? 70 : 120;
+      const cycleDays = cycle === "1" ? 7 : 14;
+      const cumulativeDuty = getCumulative(cycleDays) + totalDuty;
+
+      if (cumulativeDuty > cycleLimit) violation = `Over ${cycleLimit}h / ${cycleDays}d`;
 
       entries.push({
-        dayNumber,
+        dayNumber: entries.length + 1,
         date,
         shift1: formatTimeRange(s1Start, s1End),
         shift2: formatTimeRange(s2Start, s2End),
         splitHours: splitHours.toFixed(2) + "h",
         overtime: `${otBefore.toFixed(2)} / ${otBetween.toFixed(2)} / ${otAfter.toFixed(2)} h`,
-        totalDuty: totalDuty.toFixed(2) + "h",
+        totalDuty: totalDuty.toFixed(2),
         cumulativeDuty: cumulativeDuty.toFixed(2),
         TETRange: (() => {
           if (startTime == null) return "-";
           const endTET = (startTime + 16) % 24;
-          return `${formatTime24To12(startTime)} to ${formatTime24To12(endTET)} (16.00h)`;
+          return `${formatTime24To12(startTime)} - ${formatTime24To12(endTET)} (16h)`;
         })(),
         offDuty: offDuty.toFixed(2) + "h",
         violation,
@@ -231,7 +234,7 @@
       });
 
       renderTable();
-      clearInputs();
+      document.querySelectorAll("input").forEach(i => i.value = "");
     }
 
     function renderTable() {
@@ -246,12 +249,12 @@
           <td>${entry.shift2}</td>
           <td>${entry.splitHours}</td>
           <td>${entry.overtime}</td>
-          <td>${entry.totalDuty}</td>
+          <td>${entry.totalDuty}h</td>
           <td>${entry.cumulativeDuty}h</td>
           <td>${entry.TETRange}</td>
           <td>${entry.offDuty}</td>
           <td>${entry.violation}</td>
-          <td><button onclick="deleteEntry(${i})">Delete</button></td>
+          <td><button onclick="deleteEntry(${i})">X</button></td>
         `;
         tbody.appendChild(row);
       });
@@ -263,26 +266,22 @@
       renderTable();
     }
 
-    function clearInputs() {
-      document.querySelectorAll("input").forEach(i => i.value = "");
-    }
-
     function downloadPDF() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
       doc.setFontSize(12);
-      doc.text("NSC Service Hours Report", 14, 14);
+      doc.text("NSC Hours Report", 14, 14);
+      let y = 22;
 
-      let y = 20;
-      entries.forEach((e, i) => {
+      entries.forEach(e => {
         const lines = [
-          `Day ${e.dayNumber} (${e.date})`,
+          `Day ${e.dayNumber} - ${e.date}`,
           `Shift 1: ${e.shift1}`,
           `Shift 2: ${e.shift2}`,
-          `OT: ${e.overtime}`,
-          `Total Duty: ${e.totalDuty}, TET: ${e.TETRange}`,
-          `Split Hours: ${e.splitHours}, Off-Duty: ${e.offDuty}`,
-          `Cumulative: ${e.cumulativeDuty}h, Violation: ${e.violation}`
+          `OT (Before/Between/After): ${e.overtime}`,
+          `Split: ${e.splitHours} | TET: ${e.TETRange}`,
+          `Total Duty: ${e.totalDuty}h | Cumulative: ${e.cumulativeDuty}h`,
+          `Off-Duty: ${e.offDuty} | Violation: ${e.violation}`
         ];
         lines.forEach(line => {
           doc.text(line, 14, y);
@@ -295,7 +294,7 @@
         }
       });
 
-      doc.save("nsc_hours_report.pdf");
+      doc.save("NSC_Report.pdf");
     }
   </script>
 </body>
