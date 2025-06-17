@@ -1,27 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>NSC Hours Tracker</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #f0f2f5;
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
       margin: 0;
       padding: 20px;
     }
     .container {
-      max-width: 900px;
-      margin: auto;
+      max-width: 1000px;
       background: white;
+      margin: auto;
       padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border-radius: 10px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
     }
     h2 {
       text-align: center;
-      color: #0056b3;
     }
     label {
       display: block;
@@ -31,216 +30,263 @@
     input, select {
       width: 100%;
       padding: 8px;
-      margin-top: 5px;
-      border-radius: 5px;
+      margin-top: 4px;
       border: 1px solid #ccc;
+      border-radius: 6px;
     }
-    .group {
+    .row {
       display: flex;
-      flex-wrap: wrap;
       gap: 10px;
+      flex-wrap: wrap;
     }
-    .group > div {
-      flex: 1 1 48%;
+    .row > div {
+      flex: 1 1 30%;
     }
     button {
       margin-top: 15px;
-      padding: 10px 15px;
-      background-color: #007bff;
-      color: white;
+      padding: 10px 20px;
+      background: #007bff;
       border: none;
-      border-radius: 5px;
+      color: white;
+      border-radius: 6px;
       cursor: pointer;
     }
     button:hover {
-      background-color: #0056b3;
+      background: #0056b3;
     }
     table {
       width: 100%;
-      border-collapse: collapse;
       margin-top: 20px;
-      font-size: 14px;
+      border-collapse: collapse;
     }
     th, td {
+      padding: 8px;
       border: 1px solid #ccc;
-      padding: 6px;
       text-align: center;
     }
     th {
       background: #007bff;
       color: white;
     }
-    @media (max-width: 600px) {
-      .group > div {
-        flex: 1 1 100%;
-      }
+    .delete-btn {
+      background: red;
+      color: white;
+      border: none;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>NSC Hours Tracker</h2>
+<div class="container">
+  <h2>NSC Hours Tracker</h2>
 
-    <label for="cycle">Select Cycle</label>
-    <select id="cycle">
-      <option value="1">Cycle 1 (70hr / 7 days)</option>
-      <option value="2">Cycle 2 (120hr / 14 days)</option>
-    </select>
+  <label for="cycle">Select Cycle</label>
+  <select id="cycle">
+    <option value="1">Cycle 1 (70hr / 7 days)</option>
+    <option value="2">Cycle 2 (120hr / 14 days)</option>
+  </select>
 
-    <label>Date</label>
-    <input type="date" id="date">
+  <label>Date</label>
+  <input type="date" id="date" />
 
-    <div class="group">
-      <div>
-        <label>Shift 1 Start</label>
-        <input type="text" id="shift1Start" placeholder="e.g., 0400">
-      </div>
-      <div>
-        <label>Shift 1 End</label>
-        <input type="text" id="shift1End" placeholder="e.g., 1200">
-      </div>
-      <div>
-        <label>Shift 2 Start (optional)</label>
-        <input type="text" id="shift2Start" placeholder="e.g., 1500">
-      </div>
-      <div>
-        <label>Shift 2 End (optional)</label>
-        <input type="text" id="shift2End" placeholder="e.g., 1900">
-      </div>
-      <div>
-        <label>OT Before Shift 1</label>
-        <input type="text" id="otBefore" placeholder="e.g., 0430-0500">
-      </div>
-      <div>
-        <label>OT Between Shifts</label>
-        <input type="text" id="otBetween" placeholder="e.g., 1400-1500">
-      </div>
-      <div>
-        <label>OT After Shift 2</label>
-        <input type="text" id="otAfter" placeholder="e.g., 1900-2000">
-      </div>
+  <div class="row">
+    <div>
+      <label>Shift 1 Start</label>
+      <input type="text" id="shift1Start" placeholder="e.g., 0700" />
     </div>
-
-    <button onclick="submitDay()">Submit Day</button>
-
-    <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Date</th>
-          <th>Shift 1</th>
-          <th>Shift 2</th>
-          <th>OT (B/Btwn/A)</th>
-          <th>Duty</th>
-          <th>Cumulative</th>
-          <th>TET</th>
-          <th>Off-Duty</th>
-          <th>Violation</th>
-        </tr>
-      </thead>
-      <tbody id="results"></tbody>
-    </table>
+    <div>
+      <label>Shift 1 End</label>
+      <input type="text" id="shift1End" placeholder="e.g., 1500" />
+    </div>
+    <div>
+      <label>Shift 2 Start (optional)</label>
+      <input type="text" id="shift2Start" placeholder="e.g., 1600" />
+    </div>
+    <div>
+      <label>Shift 2 End (optional)</label>
+      <input type="text" id="shift2End" placeholder="e.g., 1800" />
+    </div>
   </div>
 
-  <script>
-    const entries = [];
+  <div class="row">
+    <div>
+      <label>Overtime Before Shift</label>
+      <input type="text" id="otBefore" placeholder="e.g., 0430-0500" />
+    </div>
+    <div>
+      <label>Overtime Between Shifts</label>
+      <input type="text" id="otBetween" placeholder="e.g., 1400-1430" />
+    </div>
+    <div>
+      <label>Overtime After Shift</label>
+      <input type="text" id="otAfter" placeholder="e.g., 1900-1930" />
+    </div>
+  </div>
 
-    function parseTime(str) {
-      if (!str) return null;
-      str = str.replace(":", "").padStart(4, '0');
-      const h = parseInt(str.slice(0, 2), 10);
-      const m = parseInt(str.slice(2), 10);
-      return isNaN(h) || isNaN(m) ? null : h + m / 60;
+  <button onclick="submitDay()">Submit Day</button>
+
+  <table>
+    <thead>
+    <tr>
+      <th>#</th>
+      <th>Date</th>
+      <th>Shift 1</th>
+      <th>Shift 2</th>
+      <th>OT (B/Btwn/A)</th>
+      <th>Duty</th>
+      <th>Cumulative</th>
+      <th>TET</th>
+      <th>Off-Duty</th>
+      <th>Violation</th>
+      <th>Action</th>
+    </tr>
+    </thead>
+    <tbody id="results"></tbody>
+  </table>
+</div>
+
+<script>
+  const entries = [];
+
+  function parseTime(str) {
+    if (!str) return null;
+    str = str.trim().replace(":", "").padStart(4, "0");
+    const h = parseInt(str.slice(0, 2));
+    const m = parseInt(str.slice(2));
+    if (isNaN(h) || isNaN(m)) return null;
+    return h + m / 60;
+  }
+
+  function duration(str) {
+    const parts = str.split("-");
+    if (parts.length !== 2) return 0;
+    const start = parseTime(parts[0]);
+    const end = parseTime(parts[1]);
+    return (end - start + 24) % 24;
+  }
+
+  function formatRange(start, end) {
+    if (start == null || end == null) return "-";
+    const pad = (n) => String(Math.floor(n)).padStart(2, "0") + ":" + String(Math.round((n % 1) * 60)).padStart(2, "0");
+    return `${pad(start)} - ${pad(end)}`;
+  }
+
+  function getCumulative(days, currentDate) {
+    const current = new Date(currentDate);
+    return entries
+      .filter((e) => {
+        const d = new Date(e.date);
+        const diff = (current - d) / (1000 * 60 * 60 * 24);
+        return diff <= (days - 1);
+      })
+      .reduce((sum, e) => sum + e.totalDuty, 0);
+  }
+
+  function submitDay() {
+    const date = document.getElementById("date").value;
+    const s1 = parseTime(document.getElementById("shift1Start").value);
+    const e1 = parseTime(document.getElementById("shift1End").value);
+    const s2 = parseTime(document.getElementById("shift2Start").value);
+    const e2 = parseTime(document.getElementById("shift2End").value);
+    const cycle = document.getElementById("cycle").value;
+
+    const otB = duration(document.getElementById("otBefore").value);
+    const otBtwn = duration(document.getElementById("otBetween").value);
+    const otA = duration(document.getElementById("otAfter").value);
+
+    if (!date || s1 == null || e1 == null) {
+      alert("Please enter date and valid Shift 1 times.");
+      return;
     }
 
-    function parseTimeRange(range) {
-      if (!range.includes("-")) return 0;
-      const [start, end] = range.split("-").map(s => parseTime(s.trim()));
-      return start != null && end != null ? ((end - start + 24) % 24) : 0;
-    }
+    const shift1Hours = (e1 - s1 + 24) % 24;
+    const shift2Hours = s2 != null && e2 != null ? (e2 - s2 + 24) % 24 : 0;
+    const totalDuty = shift1Hours + shift2Hours + otB + otBtwn + otA;
+    const TET = shift1Hours + shift2Hours;
 
-    function formatRange(start, end) {
-      if (start == null || end == null) return "-";
-      const pad = n => String(Math.floor(n)).padStart(2, '0') + ":" + String(Math.round((n % 1) * 60)).padStart(2, '0');
-      return `${pad(start)} - ${pad(end)}`;
-    }
+    // Detect off-duty time since last entry
+    let offDuty = "-";
+    let cumulative = 0;
+    if (entries.length > 0) {
+      const prev = new Date(entries[entries.length - 1].date);
+      const curr = new Date(date);
+      const daysOff = (curr - prev) / (1000 * 60 * 60 * 24);
 
-    function getCumulative(days, currentDate) {
-      const current = new Date(currentDate);
-      return entries
-        .filter(e => {
-          const d = new Date(e.date);
-          return (current - d) / (1000 * 60 * 60 * 24) <= (days - 1);
-        })
-        .reduce((sum, e) => sum + e.totalDuty, 0);
-    }
+      // Use actual timestamp logic for off-duty
+      const prevEnd = entries[entries.length - 1].endTimestamp || 0;
+      const currStart = new Date(date);
+      currStart.setHours(Math.floor(s1), Math.round((s1 % 1) * 60));
+      offDuty = ((currStart - prevEnd) / 3600000).toFixed(2);
 
-    function submitDay() {
-      const date = document.getElementById("date").value;
-      const s1 = parseTime(document.getElementById("shift1Start").value);
-      const e1 = parseTime(document.getElementById("shift1End").value);
-      const s2 = parseTime(document.getElementById("shift2Start").value);
-      const e2 = parseTime(document.getElementById("shift2End").value);
-      const otB = parseTimeRange(document.getElementById("otBefore").value);
-      const otBtwn = parseTimeRange(document.getElementById("otBetween").value);
-      const otA = parseTimeRange(document.getElementById("otAfter").value);
-      const cycle = document.getElementById("cycle").value;
-
-      if (!date || s1 == null || e1 == null) {
-        alert("Please enter date and valid Shift 1 times.");
-        return;
+      // Reset if off-duty ≥ 36h
+      if (offDuty >= 36) {
+        cumulative = totalDuty;
+      } else {
+        cumulative = getCumulative(cycle === "1" ? 7 : 14, date) + totalDuty;
       }
-
-      const shift1Hours = (e1 - s1 + 24) % 24;
-      const shift2Hours = (s2 != null && e2 != null) ? (e2 - s2 + 24) % 24 : 0;
-      const otHours = otB + otBtwn + otA;
-      const totalDuty = shift1Hours + shift2Hours + otHours;
-      const tet = s2 != null && e2 != null ? (e2 - s1 + 24) % 24 : shift1Hours;
-      const cumulative = getCumulative(cycle === "1" ? 7 : 14, date) + totalDuty;
-
-      const prevEntry = entries.length > 0 ? entries[entries.length - 1] : null;
-      let offDuty = "-";
-      if (prevEntry) {
-        const prevEnd = prevEntry.endTime;
-        const currStart = s1;
-        offDuty = ((currStart - prevEnd + 24) % 24).toFixed(2);
-      }
-
-      let violation = "";
-      if (totalDuty > 14) violation = "Duty > 14h";
-      if (tet > 16) violation = "TET > 16h";
-      if (cycle === "1" && cumulative > 70) violation = "Cycle > 70h";
-      if (cycle === "2" && cumulative > 120) violation = "Cycle > 120h";
-
-      entries.push({
-        date, shift1: formatRange(s1, e1), shift2: formatRange(s2, e2),
-        ot: `${otB.toFixed(2)}/${otBtwn.toFixed(2)}/${otA.toFixed(2)}`,
-        totalDuty, cumulative, tet: tet.toFixed(2), offDuty, violation,
-        endTime: e2 ?? e1
-      });
-
-      renderTable();
+    } else {
+      cumulative = totalDuty;
     }
 
-    function renderTable() {
-      const tbody = document.getElementById("results");
-      tbody.innerHTML = "";
-      entries.forEach((e, i) => {
-        const row = tbody.insertRow();
-        row.innerHTML = `
-          <td>${i + 1}</td>
-          <td>${e.date}</td>
-          <td>${e.shift1}</td>
-          <td>${e.shift2}</td>
-          <td>${e.ot}</td>
-          <td>${e.totalDuty.toFixed(2)}</td>
-          <td>${e.cumulative.toFixed(2)}</td>
-          <td>${e.tet}</td>
-          <td>${e.offDuty}</td>
-          <td>${e.violation || "OK"}</td>
-        `;
-      });
-    }
-  </script>
+    // Prepare timestamps to help with future off-duty checks
+    const shiftEnd = new Date(date);
+    const lastEnd = e2 != null ? e2 : e1;
+    shiftEnd.setHours(Math.floor(lastEnd), Math.round((lastEnd % 1) * 60));
+
+    let violation = "";
+    if (TET > 16) violation = "TET > 16h";
+    else if (totalDuty > 14) violation = "Duty > 14h";
+    else if (cycle === "1" && cumulative > 70) violation = "Cycle 1 > 70h";
+    else if (cycle === "2" && cumulative > 120) violation = "Cycle 2 > 120h";
+    else violation = "OK";
+
+    entries.push({
+      date,
+      s1,
+      e1,
+      s2,
+      e2,
+      otB,
+      otBtwn,
+      otA,
+      totalDuty,
+      cumulative,
+      TET,
+      offDuty,
+      violation,
+      endTimestamp: shiftEnd
+    });
+
+    renderTable();
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById("results");
+    tbody.innerHTML = "";
+    entries.forEach((e, i) => {
+      const row = tbody.insertRow();
+      row.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${e.date}</td>
+        <td>${formatRange(e.s1, e.e1)}</td>
+        <td>${formatRange(e.s2, e.e2)}</td>
+        <td>${e.otB.toFixed(2)}/${e.otBtwn.toFixed(2)}/${e.otA.toFixed(2)}</td>
+        <td>${e.totalDuty.toFixed(2)}</td>
+        <td>${e.cumulative.toFixed(2)}</td>
+        <td>${e.TET.toFixed(2)}</td>
+        <td>${e.offDuty}</td>
+        <td>${e.violation}</td>
+        <td><button class="delete-btn" onclick="deleteEntry(${i})">🗑️</button></td>
+      `;
+    });
+  }
+
+  function deleteEntry(index) {
+    entries.splice(index, 1);
+    renderTable();
+  }
+</script>
 </body>
 </html>
