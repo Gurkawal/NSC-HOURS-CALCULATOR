@@ -1,148 +1,145 @@
-<!DOCTYPE html><html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NSC Duty Tracker</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; background: #f0f2f5; }
-    h1 { text-align: center; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background-color: #e0e0e0; }
-    input, button, select { padding: 5px; margin: 5px; }
-    .delete-btn { color: red; cursor: pointer; }
-    .flex-row { display: flex; flex-wrap: wrap; gap: 10px; }
-    .flex-row label { display: flex; flex-direction: column; }
-  </style>
-</head>
-<body>
-<h1>NSC Daily Duty Tracker</h1><div class="flex-row">
-  <label>Date<input type="date" id="date" /></label>
-  <label>Shift 1 Start<input type="time" id="shift1Start" /></label>
-  <label>Shift 1 End<input type="time" id="shift1End" /></label>
-  <label>Shift 2 Start<input type="time" id="shift2Start" /></label>
-  <label>Shift 2 End<input type="time" id="shift2End" /></label>
-</div>
-<button onclick="addEntry()">Submit</button><table id="resultTable">
-  <thead>
-    <tr>
-      <th>Day</th>
-      <th>Date</th>
-      <th>Shift 1</th>
-      <th>Shift 2</th>
-      <th>Split Hours</th>
-      <th>Overtime (Before / Between / After)</th>
-      <th>Total Duty</th>
-      <th>Cumulative Duty</th>
-      <th>TET</th>
-      <th>Off-Duty</th>
-      <th>NSC Violation</th>
-      <th>Action</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table><script>
-let entries = [];
-let cumulativeDuty = 0;
+<script>
+  const entries = [];
+  let cumulativeDuty = 0;
 
-function parseTime(t) {
-  if (!t) return null;
-  const [h, m] = t.split(":").map(Number);
-  return h + m / 60;
-}
-
-function formatTime(h) {
-  const hour = Math.floor(h % 24);
-  const min = Math.round((h % 1) * 60);
-  const ampm = hour >= 12 ? "PM" : "AM";
-  const h12 = hour % 12 === 0 ? 12 : hour % 12;
-  return `${h12}:${min.toString().padStart(2, "0")} ${ampm}`;
-}
-
-function formatRange(start, end) {
-  return `${formatTime(start)} to ${formatTime(end)} (${(end - start).toFixed(2)}h)`;
-}
-
-function addEntry() {
-  const date = document.getElementById("date").value;
-  const s1s = parseTime(document.getElementById("shift1Start").value);
-  const s1e = parseTime(document.getElementById("shift1End").value);
-  const s2s = parseTime(document.getElementById("shift2Start").value);
-  const s2e = parseTime(document.getElementById("shift2End").value);
-
-  if (!date || s1s == null || s1e == null) return alert("Enter at least Shift 1 and date.");
-
-  let shift1Duration = s1e - s1s;
-  let shift2Duration = s2s != null && s2e != null ? s2e - s2s : 0;
-  if (shift2Duration < 0) shift2Duration += 24;
-  if (shift1Duration < 0) shift1Duration += 24;
-
-  let split = s2s != null ? s2s - s1e : 0;
-  if (split < 0) split += 24;
-
-  const totalDuty = shift1Duration + shift2Duration;
-  cumulativeDuty += totalDuty;
-  const TET = totalDuty + split;
-
-  let offDuty = 24;
-  if (entries.length > 0) {
-    const prev = entries[entries.length - 1];
-    const prevEnd = prev.s2e ? prev.s2e : prev.s1e;
-    let endTime = prevEnd;
-    if (new Date(date) > new Date(prev.date)) endTime -= 24; // if next day, compensate clock
-    offDuty = s1s - endTime;
-    if (offDuty < 0) offDuty += 24;
+  function parseTime(str) {
+    if (!str) return null;
+    let hour = parseInt(str.slice(0, 2), 10);
+    let min = parseInt(str.slice(2), 10);
+    return hour + min / 60;
   }
 
-  const violation = offDuty < 8 ? "Off-duty <8h" : "None";
+  function formatTime24To12(time24) {
+    const hours = Math.floor(time24) % 24;
+    const minutes = Math.round((time24 % 1) * 60);
+    const suffix = hours >= 12 ? "PM" : "AM";
+    const displayHour = ((hours + 11) % 12 + 1);
+    return `${displayHour}:${minutes.toString().padStart(2, "0")} ${suffix}`;
+  }
 
-  const entry = {
-    day: entries.length + 1,
-    date,
-    s1: formatRange(s1s, s1e),
-    s2: s2s != null && s2e != null ? formatRange(s2s, s2e) : "-",
-    split: s2s != null ? `${split.toFixed(2)}h` : "0.00h",
-    overtime: "0.00 / 0.00 / 0.00 h",
-    total: `${totalDuty.toFixed(2)}h`,
-    cumulative: `${cumulativeDuty.toFixed(2)}h`,
-    tet: `${TET.toFixed(2)}h`,
-    offDuty: `${offDuty.toFixed(2)}h`,
-    violation,
-    s1e, s2e: s2e || null
-  };
+  function formatTimeRange(start, end) {
+    if (start == null || end == null) return "-";
+    const duration = (end >= start ? end - start : 24 + end - start);
+    return `${formatTime24To12(start)} to ${formatTime24To12(end)} (${duration.toFixed(2)}h)`;
+  }
 
-  entries.push(entry);
-  renderTable();
-  document.querySelectorAll("input[type='time'], input[type='date']").forEach(e => e.value = "");
-}
+  function submitDay() {
+    const date = document.getElementById("date").value;
+    const s1Start = parseTime(document.getElementById("shift1Start").value);
+    const s1End = parseTime(document.getElementById("shift1End").value);
+    const s2Start = parseTime(document.getElementById("shift2Start").value);
+    const s2End = parseTime(document.getElementById("shift2End").value);
+    const otBefore = parseFloat(document.getElementById("otBefore").value) || 0;
+    const otBetween = parseFloat(document.getElementById("otBetween").value) || 0;
+    const otAfter = parseFloat(document.getElementById("otAfter").value) || 0;
 
-function renderTable() {
-  const tbody = document.querySelector("#resultTable tbody");
-  tbody.innerHTML = "";
-  entries.forEach((e, i) => {
-    const row = `<tr>
-      <td>${e.day}</td>
-      <td>${e.date}</td>
-      <td>${e.s1}</td>
-      <td>${e.s2}</td>
-      <td>${e.split}</td>
-      <td>${e.overtime}</td>
-      <td>${e.total}</td>
-      <td>${e.cumulative}</td>
-      <td>${e.tet}</td>
-      <td>${e.offDuty}</td>
-      <td>${e.violation}</td>
-      <td><span class="delete-btn" onclick="deleteRow(${i})">Delete</span></td>
-    </tr>`;
-    tbody.insertAdjacentHTML("beforeend", row);
-  });
-}
+    const shift1Duration = (s1Start != null && s1End != null) ? ((s1End - s1Start + 24) % 24) : 0;
+    const shift2Duration = (s2Start != null && s2End != null) ? ((s2End - s2Start + 24) % 24) : 0;
+    const splitHours = (s1End != null && s2Start != null) ? ((s2Start - s1End + 24) % 24) : 0;
+    const totalDuty = shift1Duration + shift2Duration + otBefore + otBetween + otAfter;
+    const TET = shift1Duration + shift2Duration;
+    const TETStart = s1Start != null ? s1Start : s2Start;
+    const TETEnd = s2End != null ? s2End : s1End;
 
-function deleteRow(index) {
-  cumulativeDuty -= parseFloat(entries[index].total);
-  entries.splice(index, 1);
-  entries.forEach((e, i) => e.day = i + 1);
-  renderTable();
-}
-</script></body>
-</html>
+    cumulativeDuty += totalDuty;
+
+    const dayNumber = entries.length + 1;
+    let offDuty = 24;
+    let violation = "None";
+
+    if (entries.length > 0) {
+      const prev = entries[entries.length - 1];
+      const prevEnd = prev.endTime;
+      const todayStart = s1Start != null ? s1Start : s2Start;
+      const timeGap = (todayStart - prevEnd + 24) % 24;
+      offDuty = timeGap;
+      if (offDuty < 8) violation = "Off-duty <8h";
+    }
+
+    if (totalDuty > 14) violation = "Over 14h duty";
+    if (TET > 16) violation = "Over 16h TET";
+
+    const endTime = s2End != null ? s2End : s1End;
+
+    entries.push({
+      date,
+      dayNumber,
+      shift1: formatTimeRange(s1Start, s1End),
+      shift2: formatTimeRange(s2Start, s2End),
+      splitHours: splitHours.toFixed(2) + "h",
+      overtime: `${otBefore.toFixed(2)} / ${otBetween.toFixed(2)} / ${otAfter.toFixed(2)} h`,
+      totalDuty: totalDuty.toFixed(2) + "h",
+      TET: `${formatTime24To12(TETStart)} to ${formatTime24To12(TETEnd)} (${TET.toFixed(2)}h)`,
+      offDuty: offDuty.toFixed(2) + "h",
+      violation,
+      endTime,
+      cumulativeDuty: cumulativeDuty.toFixed(2) + "h"
+    });
+
+    renderTable();
+    clearInputs();
+  }
+
+  function renderTable() {
+    const tbody = document.querySelector("#results tbody");
+    tbody.innerHTML = "";
+    entries.forEach((entry, i) => {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${entry.dayNumber}</td>
+        <td>${entry.date}</td>
+        <td>${entry.shift1}</td>
+        <td>${entry.shift2}</td>
+        <td>${entry.splitHours}</td>
+        <td>${entry.overtime}</td>
+        <td>${entry.totalDuty}</td>
+        <td>${entry.TET}</td>
+        <td>${entry.offDuty}</td>
+        <td>${entry.violation}</td>
+        <td><button onclick="deleteEntry(${i})">Delete</button></td>
+      `;
+      tbody.appendChild(row);
+    });
+
+    // Display cumulative duty below table
+    const footer = document.getElementById("cumulativeFooter");
+    if (!footer) {
+      const cumRow = document.createElement("tr");
+      cumRow.id = "cumulativeFooter";
+      cumRow.innerHTML = `
+        <td colspan="11" style="text-align:right; font-weight:bold; background:#e2e2e2;">
+          Cumulative Duty Time: ${cumulativeDuty.toFixed(2)}h
+        </td>
+      `;
+      tbody.appendChild(cumRow);
+    } else {
+      footer.innerHTML = `
+        <td colspan="11" style="text-align:right; font-weight:bold; background:#e2e2e2;">
+          Cumulative Duty Time: ${cumulativeDuty.toFixed(2)}h
+        </td>
+      `;
+    }
+  }
+
+  function deleteEntry(index) {
+    cumulativeDuty -= parseFloat(entries[index].totalDuty);
+    entries.splice(index, 1);
+    entries.forEach((e, i) => e.dayNumber = i + 1);
+    renderTable();
+  }
+
+  function clearInputs() {
+    document.getElementById("date").value = "";
+    document.getElementById("shift1Start").value = "";
+    document.getElementById("shift1End").value = "";
+    document.getElementById("shift2Start").value = "";
+    document.getElementById("shift2End").value = "";
+    document.getElementById("otBefore").value = "";
+    document.getElementById("otBetween").value = "";
+    document.getElementById("otAfter").value = "";
+  }
+
+  function downloadPDF() {
+    alert("PDF export will be added soon.");
+  }
+</script>
