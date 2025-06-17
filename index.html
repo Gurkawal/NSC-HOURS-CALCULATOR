@@ -126,26 +126,32 @@
   </div>
 
   <button onclick="submitDay()">Submit Day</button>
+  <button onclick="downloadPDF()">Download PDF</button>
 
-  <table>
-    <thead>
-    <tr>
-      <th>#</th>
-      <th>Date</th>
-      <th>Shift 1</th>
-      <th>Shift 2</th>
-      <th>OT (B/Btwn/A)</th>
-      <th>Duty</th>
-      <th>Cumulative</th>
-      <th>TET</th>
-      <th>Off-Duty</th>
-      <th>Violation</th>
-      <th>Action</th>
-    </tr>
-    </thead>
-    <tbody id="results"></tbody>
-  </table>
+  <div id="pdfContent">
+    <table>
+      <thead>
+      <tr>
+        <th>#</th>
+        <th>Date</th>
+        <th>Shift 1</th>
+        <th>Shift 2</th>
+        <th>OT (B/Btwn/A)</th>
+        <th>Duty</th>
+        <th>Cumulative</th>
+        <th>TET</th>
+        <th>Off-Duty</th>
+        <th>Violation</th>
+        <th>Action</th>
+      </tr>
+      </thead>
+      <tbody id="results"></tbody>
+    </table>
+  </div>
 </div>
+
+<!-- html2pdf CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <script>
   const entries = [];
@@ -206,21 +212,18 @@
     const totalDuty = shift1Hours + shift2Hours + otB + otBtwn + otA;
     const TET = shift1Hours + shift2Hours;
 
-    // Detect off-duty time since last entry
     let offDuty = "-";
     let cumulative = 0;
+    let offDutyViolation = false;
     if (entries.length > 0) {
       const prev = new Date(entries[entries.length - 1].date);
       const curr = new Date(date);
-      const daysOff = (curr - prev) / (1000 * 60 * 60 * 24);
-
-      // Use actual timestamp logic for off-duty
       const prevEnd = entries[entries.length - 1].endTimestamp || 0;
       const currStart = new Date(date);
       currStart.setHours(Math.floor(s1), Math.round((s1 % 1) * 60));
       offDuty = ((currStart - prevEnd) / 3600000).toFixed(2);
+      offDutyViolation = offDuty < 8;
 
-      // Reset if off-duty ≥ 36h
       if (offDuty >= 36) {
         cumulative = totalDuty;
       } else {
@@ -230,7 +233,6 @@
       cumulative = totalDuty;
     }
 
-    // Prepare timestamps to help with future off-duty checks
     const shiftEnd = new Date(date);
     const lastEnd = e2 != null ? e2 : e1;
     shiftEnd.setHours(Math.floor(lastEnd), Math.round((lastEnd % 1) * 60));
@@ -240,22 +242,11 @@
     else if (totalDuty > 14) violation = "Duty > 14h";
     else if (cycle === "1" && cumulative > 70) violation = "Cycle 1 > 70h";
     else if (cycle === "2" && cumulative > 120) violation = "Cycle 2 > 120h";
+    else if (offDutyViolation) violation = "Off-duty < 8h";
     else violation = "OK";
 
     entries.push({
-      date,
-      s1,
-      e1,
-      s2,
-      e2,
-      otB,
-      otBtwn,
-      otA,
-      totalDuty,
-      cumulative,
-      TET,
-      offDuty,
-      violation,
+      date, s1, e1, s2, e2, otB, otBtwn, otA, totalDuty, cumulative, TET, offDuty, violation,
       endTimestamp: shiftEnd
     });
 
@@ -286,6 +277,17 @@
   function deleteEntry(index) {
     entries.splice(index, 1);
     renderTable();
+  }
+
+  function downloadPDF() {
+    const element = document.getElementById("pdfContent");
+    html2pdf().set({
+      margin: 0.5,
+      filename: 'NSC-Hours-Tracker.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
+    }).from(element).save();
   }
 </script>
 </body>
