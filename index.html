@@ -4,27 +4,26 @@
   <meta charset="UTF-8">
   <title>NSC Service Hours Calculator</title>
   <style>
-    body { font-family: Arial, sans-serif; background: #f8f8f8; padding: 20px; }
+    body { font-family: Arial, sans-serif; background-color: #f0f0f0; padding: 20px; }
     h1 { color: #333; }
-    label { display: block; margin: 5px 0; }
+    label, input { display: block; margin: 5px 0; }
     input[type="text"] { padding: 5px; width: 150px; }
-    button { margin: 10px 5px 0 0; padding: 8px 16px; }
+    button { margin-top: 10px; padding: 10px 20px; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background-color: #e0e0e0; }
+    th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
+    th { background-color: #ddd; }
   </style>
 </head>
 <body>
   <h1>NSC Service Hours Calculator</h1>
-
   <form id="nscForm">
-    <label>Shift 1 Start (e.g. 0500): <input type="text" id="shift1Start" required></label>
-    <label>Shift 1 End (e.g. 1300): <input type="text" id="shift1End" required></label>
+    <label>Shift 1 Start (e.g., 0500): <input type="text" id="shift1Start"></label>
+    <label>Shift 1 End (e.g., 1300): <input type="text" id="shift1End"></label>
     <label>Shift 2 Start (optional): <input type="text" id="shift2Start"></label>
     <label>Shift 2 End (optional): <input type="text" id="shift2End"></label>
-    <label>Overtime Before Shift 1: <input type="text" id="otBefore"></label>
-    <label>Overtime Between Shifts: <input type="text" id="otBetween"></label>
-    <label>Overtime After Shift 2: <input type="text" id="otAfter"></label>
+    <label>Overtime Before Shift 1 (optional): <input type="text" id="otBefore"></label>
+    <label>Overtime Between Shifts (optional): <input type="text" id="otBetween"></label>
+    <label>Overtime After Shift 2 (optional): <input type="text" id="otAfter"></label>
     <button type="submit">Submit Day</button>
   </form>
 
@@ -47,18 +46,18 @@
   </table>
 
   <script>
-    let currentDay = 1;
+    let days = [];
     let lastDayEnd = null;
-    let totalOffDutyAccumulated = 0;
     let sevenDayWindow = [];
+    let totalOffDutyAccumulated = 0;
+    let dayCounter = 1;
 
     function timeToMinutes(timeStr) {
       if (!timeStr) return null;
       let time = parseInt(timeStr);
-      if (isNaN(time)) return null;
       let hour = Math.floor(time / 100);
-      let min = time % 100;
-      return hour * 60 + min;
+      let minutes = time % 100;
+      return hour * 60 + minutes;
     }
 
     function minutesToHours(mins) {
@@ -66,60 +65,85 @@
     }
 
     function duration(start, end) {
+      if (!start || !end) return 0;
       let s = timeToMinutes(start);
       let e = timeToMinutes(end);
-      if (s === null || e === null) return 0;
       if (e < s) e += 1440;
       return e - s;
     }
 
-    function isCycleReset(mins) {
-      return mins >= 2160; // 36 hours
+    function isCycleReset(offDutyMinutes) {
+      return offDutyMinutes >= 2160; // 36 hours
     }
 
-    function addRowToTable(day, data) {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${day}</td>
-        <td>${data.shift1Range} (${minutesToHours(data.shift1Mins)}h)</td>
-        <td>${data.shift2Range || "-"} ${data.shift2Mins ? `(${minutesToHours(data.shift2Mins)}h)` : ""}</td>
-        <td>${minutesToHours(data.splitMins)}h</td>
-        <td>${minutesToHours(data.otBeforeMins)} / ${minutesToHours(data.otBetweenMins)} / ${minutesToHours(data.otAfterMins)} h</td>
-        <td>${minutesToHours(data.totalDutyMins)}h</td>
-        <td>${minutesToHours(data.tet)}h</td>
-        <td>${minutesToHours(data.offDuty)}h</td>
-        <td>${data.violation.length ? data.violation.join(", ") : "None"}</td>
-        <td><button onclick="this.parentElement.parentElement.remove()">Delete</button></td>
-      `;
-      document.querySelector('#results tbody').appendChild(row);
+    function renderTable() {
+      const tbody = document.querySelector('#results tbody');
+      tbody.innerHTML = '';
+      days.forEach((day, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${day.s1s} to ${day.s1e} (${minutesToHours(day.shift1Mins)}h)</td>
+          <td>${day.s2s && day.s2e ? `${day.s2s} to ${day.s2e} (${minutesToHours(day.shift2Mins)}h)` : "-"}</td>
+          <td>${minutesToHours(day.splitMins)}h</td>
+          <td>${minutesToHours(day.otBeforeMins)} / ${minutesToHours(day.otBetweenMins)} / ${minutesToHours(day.otAfterMins)} h</td>
+          <td>${minutesToHours(day.totalDutyMins)}h</td>
+          <td>${minutesToHours(day.tet)}h</td>
+          <td>${minutesToHours(day.offDuty)}h</td>
+          <td>${day.violation.length ? day.violation.join(", ") : "None"}</td>
+          <td><button onclick="deleteDay(${index})">Delete</button></td>
+        `;
+        tbody.appendChild(row);
+      });
     }
 
-    document.getElementById('nscForm').addEventListener('submit', function (event) {
+    function deleteDay(index) {
+      days.splice(index, 1);
+      // Recalculate from scratch
+      lastDayEnd = null;
+      sevenDayWindow = [];
+      totalOffDutyAccumulated = 0;
+      const oldDays = [...days];
+      days = [];
+      oldDays.forEach((data) => {
+        document.getElementById('shift1Start').value = data.s1s;
+        document.getElementById('shift1End').value = data.s1e;
+        document.getElementById('shift2Start').value = data.s2s || '';
+        document.getElementById('shift2End').value = data.s2e || '';
+        document.getElementById('otBefore').value = data.ot1 || '';
+        document.getElementById('otBetween').value = data.ot2 || '';
+        document.getElementById('otAfter').value = data.ot3 || '';
+        document.getElementById('nscForm').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+      });
+    }
+
+    document.getElementById('nscForm').addEventListener('submit', function(event) {
       event.preventDefault();
 
-      const s1s = document.getElementById('shift1Start').value;
-      const s1e = document.getElementById('shift1End').value;
-      const s2s = document.getElementById('shift2Start').value;
-      const s2e = document.getElementById('shift2End').value;
-      const ot1 = document.getElementById('otBefore').value;
-      const ot2 = document.getElementById('otBetween').value;
-      const ot3 = document.getElementById('otAfter').value;
+      let s1s = document.getElementById('shift1Start').value;
+      let s1e = document.getElementById('shift1End').value;
+      let s2s = document.getElementById('shift2Start').value;
+      let s2e = document.getElementById('shift2End').value;
+      let ot1 = document.getElementById('otBefore').value;
+      let ot2 = document.getElementById('otBetween').value;
+      let ot3 = document.getElementById('otAfter').value;
 
-      const shift1Mins = duration(s1s, s1e);
-      const shift2Mins = s2s && s2e ? duration(s2s, s2e) : 0;
-      const splitMins = s2s ? duration(s1e, s2s) : 0;
+      let shift1Mins = duration(s1s, s1e);
+      let shift2Mins = s2s && s2e ? duration(s2s, s2e) : 0;
+      let splitMins = s2s ? duration(s1e, s2s) : 0;
 
-      const otBeforeMins = ot1 ? duration(ot1, s1s) : 0;
-      const otBetweenMins = ot2 ? duration(s1e, ot2) : 0;
-      const otAfterMins = ot3 ? duration(s2e || s1e, ot3) : 0;
+      let otBeforeMins = ot1 && s1s ? duration(ot1, s1s) : 0;
+      let otBetweenMins = s1e && ot2 ? duration(s1e, ot2) : 0;
+      let otAfterMins = (s2e || s1e) && ot3 ? duration(s2e || s1e, ot3) : 0;
+      let otMins = otBeforeMins + otBetweenMins + otAfterMins;
 
-      const totalDutyMins = shift1Mins + shift2Mins + otBeforeMins + otBetweenMins + otAfterMins;
-      const tet = s2e ? duration(s1s, s2e) : shift1Mins;
+      let totalDutyMins = shift1Mins + shift2Mins + otMins;
+      let tet = s2e ? duration(s1s, s2e) : shift1Mins;
 
+      let startMin = timeToMinutes(s1s);
       let offDuty = 1440;
       if (lastDayEnd !== null) {
-        let startMin = timeToMinutes(s1s);
-        if (startMin < lastDayEnd) startMin += 1440;
+        while (startMin <= lastDayEnd) startMin += 1440;
         offDuty = startMin - lastDayEnd;
         totalOffDutyAccumulated += offDuty;
       }
@@ -130,28 +154,23 @@
       }
 
       let violation = [];
-      if (totalDutyMins > 840) violation.push("Over 14h duty");
-      if (tet > 960) violation.push("TET over 16h");
+      if (totalDutyMins / 60 > 14) violation.push("Over 14h duty");
+      if (tet / 60 > 16) violation.push("TET over 16h");
       if (offDuty < 480) violation.push("Off-duty <8h");
 
+      lastDayEnd = timeToMinutes(s2e || s1e);
       sevenDayWindow.push(totalDutyMins / 60);
       if (sevenDayWindow.length > 7) sevenDayWindow.shift();
-      const weeklyHours = sevenDayWindow.reduce((a, b) => a + b, 0);
-      if (weeklyHours > 70) violation.push(">70h/7days");
+      if (sevenDayWindow.reduce((a, b) => a + b, 0) > 70) violation.push(">70h in 7 days");
 
-      lastDayEnd = timeToMinutes(s2e || s1e);
-
-      const rowData = {
-        shift1Range: `${s1s} to ${s1e}`,
-        shift2Range: s2s && s2e ? `${s2s} to ${s2e}` : "",
+      days.push({
+        s1s, s1e, s2s, s2e, ot1, ot2, ot3,
         shift1Mins, shift2Mins, splitMins,
         otBeforeMins, otBetweenMins, otAfterMins,
         totalDutyMins, tet, offDuty, violation
-      };
+      });
 
-      addRowToTable(currentDay, rowData);
-      currentDay++;
-
+      renderTable();
       document.getElementById('nscForm').reset();
     });
   </script>
