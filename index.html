@@ -32,8 +32,8 @@
     <thead>
       <tr>
         <th>Day</th>
-        <th>Shift 1 Hours</th>
-        <th>Shift 2 Hours</th>
+        <th>Shift 1 Hours (Start-End)</th>
+        <th>Shift 2 Hours (Start-End)</th>
         <th>Split Hours</th>
         <th>Overtime Total</th>
         <th>Total Duty Hours</th>
@@ -124,13 +124,13 @@
 
       let row = `<tr>
         <td>${currentDay - 1}</td>
-        <td>${minutesToHours(shift1Mins)}</td>
-        <td>${minutesToHours(shift2Mins)}</td>
-        <td>${minutesToHours(splitMins)}</td>
-        <td>${minutesToHours(otMins)}</td>
-        <td>${minutesToHours(totalDutyMins)}</td>
-        <td>${minutesToHours(tet)}</td>
-        <td>${minutesToHours(offDuty)}</td>
+        <td>${s1s || "-"} to ${s1e || "-"} (${minutesToHours(shift1Mins)}h)</td>
+        <td>${s2s && s2e ? `${s2s} to ${s2e} (${minutesToHours(shift2Mins)}h)` : "-"}</td>
+        <td>${minutesToHours(splitMins)}h</td>
+        <td>${minutesToHours(otMins)}h</td>
+        <td>${minutesToHours(totalDutyMins)}h</td>
+        <td>${minutesToHours(tet)}h</td>
+        <td>${minutesToHours(offDuty)}h</td>
         <td>${violation.length ? violation.join(", ") : "None"}</td>
       </tr>`;
 
