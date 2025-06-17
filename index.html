@@ -12,6 +12,8 @@
     th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
     th { background-color: #ddd; }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 </head>
 <body>
   <h1>NSC Service Hours Calculator</h1>
@@ -24,7 +26,9 @@
     <label>Overtime Between Shifts (optional): <input type="text" id="otBetween"></label>
     <label>Overtime After Shift 2 (optional): <input type="text" id="otAfter"></label>
     <button type="submit">Submit Day</button>
-  </form>  <table id="results">
+  </form><button onclick="downloadPDF()">Download PDF</button>
+
+  <table id="results">
     <thead>
       <tr>
         <th>Day</th>
@@ -119,5 +123,19 @@
       document.querySelector('#results tbody').insertAdjacentHTML('beforeend', row);
       document.getElementById('nscForm').reset();
     });
+
+    async function downloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const table = document.getElementById("results");
+      const canvas = await html2canvas(table);
+      const imgData = canvas.toDataURL("image/png");
+      const imgProps = doc.getImageProperties(imgData);
+      const pdfWidth = doc.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      doc.text("NSC Service Hours Log", 10, 10);
+      doc.addImage(imgData, "PNG", 10, 20, pdfWidth - 20, pdfHeight);
+      doc.save("NSC_Service_Hours.pdf");
+    }
   </script></body>
 </html>
