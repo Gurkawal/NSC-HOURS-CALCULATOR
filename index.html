@@ -1,161 +1,147 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NSC Compliance Tracker</title>
+  <meta charset="UTF-8">
+  <title>NSC Service Hours Calculator</title>
   <style>
     body {
-      font-family: sans-serif;
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
       padding: 20px;
     }
+    h2 {
+      font-size: 20px;
+    }
+    input {
+      margin: 5px;
+      padding: 5px;
+      width: 200px;
+    }
     table {
-      border-collapse: collapse;
       width: 100%;
+      border-collapse: collapse;
       margin-top: 20px;
+      background: white;
     }
     th, td {
-      border: 1px solid #aaa;
+      border: 1px solid #888;
       padding: 8px;
       text-align: center;
     }
     th {
-      background-color: #f2f2f2;
+      background-color: #ddd;
     }
-    input[type="time"], input[type="number"] {
-      width: 100px;
-    }
-    .form-row {
-      margin-bottom: 10px;
+    button {
+      margin: 10px 5px;
+      padding: 10px 15px;
     }
   </style>
 </head>
 <body>
-  <h2>NSC Compliance Tracker</h2>  <div class="form-row">
-    <label>Shift 1 Start: <input type="time" id="shift1Start" required></label>
-    <label>Shift 1 End: <input type="time" id="shift1End" required></label>
-    <label>Shift 2 Start: <input type="time" id="shift2Start"></label>
-    <label>Shift 2 End: <input type="time" id="shift2End"></label>
-    <label>Overtime Before (h): <input type="number" id="otBefore" step="0.25" value="0"></label>
-    <label>Overtime Between (h): <input type="number" id="otBetween" step="0.25" value="0"></label>
-    <label>Overtime After (h): <input type="number" id="otAfter" step="0.25" value="0"></label>
-    <button onclick="submitShift()">Submit</button>
-  </div>  <table id="resultTable">
-    <thead>
-      <tr>
-        <th>Day</th>
-        <th>Shift 1</th>
-        <th>Shift 2</th>
-        <th>Split Hours</th>
-        <th>Overtime (Before / Between / After)</th>
-        <th>Total Duty</th>
-        <th>TET</th>
-        <th>Off-Duty</th>
-        <th>NSC Violation</th>
-        <th>Cumulative Duty</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody id="tableBody"></tbody>
-  </table>  <script>
-    let dayCounter = 1;
-    let lastEndMinutes = null;
-    let totalDutySum = 0;
 
-    function parseTimeToMinutes(time) {
-      const [h, m] = time.split(":").map(Number);
-      return h * 60 + m;
-    }
+<h2>NSC Service Hours Calculator</h2>
 
-    function formatHM(minutes) {
-      const h = Math.floor(minutes / 60);
-      const m = Math.round(minutes % 60);
-      return `${h}.${m.toString().padStart(2, '0')}h`;
-    }
+<div>
+  <input id="shift1Start" placeholder="Shift 1 Start (e.g., 0500)">
+  <input id="shift1End" placeholder="Shift 1 End (e.g., 1300)">
+  <input id="shift2Start" placeholder="Shift 2 Start (optional)">
+  <input id="shift2End" placeholder="Shift 2 End (optional)">
+  <input id="overtimeBefore" placeholder="Overtime Before Shift 1 (optional)">
+  <input id="overtimeBetween" placeholder="Overtime Between Shifts (optional)">
+  <input id="overtimeAfter" placeholder="Overtime After Shift 2 (optional)">
+</div>
 
-    function submitShift() {
-      const shift1Start = document.getElementById("shift1Start").value;
-      const shift1End = document.getElementById("shift1End").value;
-      const shift2Start = document.getElementById("shift2Start").value;
-      const shift2End = document.getElementById("shift2End").value;
-      const otBefore = parseFloat(document.getElementById("otBefore").value) || 0;
-      const otBetween = parseFloat(document.getElementById("otBetween").value) || 0;
-      const otAfter = parseFloat(document.getElementById("otAfter").value) || 0;
+<button onclick="submitDay()">Submit Day</button>
+<button onclick="downloadPDF()">Download PDF</button>
 
-      if (!shift1Start || !shift1End) {
-        alert("Shift 1 start and end time are required");
-        return;
-      }
+<table id="resultTable">
+  <thead>
+    <tr>
+      <th>Day</th>
+      <th>Shift 1 Hours</th>
+      <th>Shift 2 Hours</th>
+      <th>Split Hours</th>
+      <th>Overtime Total</th>
+      <th>Total Duty Hours</th>
+      <th>TET</th>
+      <th>Off-Duty Hours</th>
+      <th>NSC Violation</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
 
-      const s1StartMin = parseTimeToMinutes(shift1Start);
-      let s1EndMin = parseTimeToMinutes(shift1End);
-      if (s1EndMin < s1StartMin) s1EndMin += 1440; // next day
-      const shift1Duration = s1EndMin - s1StartMin;
+<script>
+let dayCounter = 1;
+let previousEndTime = null;
 
-      let shift2Duration = 0, s2StartMin = 0, s2EndMin = 0, splitHours = 0;
-      let shift2Str = "-";
+function parseTime(time) {
+  if (!time) return null;
+  time = time.padStart(4, '0');
+  const h = parseInt(time.substring(0, 2), 10);
+  const m = parseInt(time.substring(2, 4), 10);
+  return h + m / 60;
+}
 
-      if (shift2Start && shift2End) {
-        s2StartMin = parseTimeToMinutes(shift2Start);
-        s2EndMin = parseTimeToMinutes(shift2End);
-        if (s2EndMin < s2StartMin) s2EndMin += 1440;
-        shift2Duration = s2EndMin - s2StartMin;
-        splitHours = (s2StartMin - s1EndMin) / 60;
-        if (splitHours < 0) splitHours = 0;
-        shift2Str = `${shift2Start} to ${shift2End} (${formatHM(shift2Duration)})`;
-      }
+function toFixedH(num) {
+  return num ? num.toFixed(2) : "0.00";
+}
 
-      const totalDuty = (shift1Duration + shift2Duration + (otBefore + otBetween + otAfter) * 60) / 60;
-      const TET = (shift1Duration + shift2Duration) / 60;
-      let offDuty = 0;
+function submitDay() {
+  const s1Start = parseTime(document.getElementById('shift1Start').value);
+  const s1End = parseTime(document.getElementById('shift1End').value);
+  const s2Start = parseTime(document.getElementById('shift2Start').value);
+  const s2End = parseTime(document.getElementById('shift2End').value);
+  const overtimeBefore = parseFloat(document.getElementById('overtimeBefore').value) || 0;
+  const overtimeBetween = parseFloat(document.getElementById('overtimeBetween').value) || 0;
+  const overtimeAfter = parseFloat(document.getElementById('overtimeAfter').value) || 0;
 
-      if (lastEndMinutes !== null) {
-        const currentStartMin = s1StartMin % 1440;
-        offDuty = (s1StartMin - lastEndMinutes) / 60;
-        if (offDuty < 0) offDuty += 1440; // day rollover
-      } else {
-        offDuty = 24;
-      }
+  const shift1Hours = s1End && s1Start ? s1End - s1Start : 0;
+  const shift2Hours = s2End && s2Start ? s2End - s2Start : 0;
+  const splitHours = s2Start && s1End ? Math.max(0, s2Start - s1End) : 0;
+  const totalOvertime = overtimeBefore + overtimeBetween + overtimeAfter;
+  const totalDuty = shift1Hours + shift2Hours + totalOvertime;
+  const tet = shift1Hours + shift2Hours;
+  const totalDutyWithBreaks = totalDuty + splitHours;
 
-      lastEndMinutes = (shift2End ? s2EndMin : s1EndMin);
-      totalDutySum += totalDuty;
+  let offDuty = 24;
+  let violation = "None";
 
-      let violation = "None";
-      if (offDuty < 8) violation = "Off-duty <8h";
-      else if (TET > 14) violation = "TET > 14h";
-      else if (totalDuty > 16) violation = "Duty > 16h";
+  if (previousEndTime !== null && s1Start !== null) {
+    let gap = s1Start - previousEndTime;
+    if (gap < 0) gap += 24;
+    offDuty = gap;
+    if (offDuty < 8) violation = "Off-duty <8h";
+  }
 
-      const row = document.createElement("tr");
-      row.innerHTML = `
-        <td>${dayCounter}</td>
-        <td>${shift1Start} to ${shift1End} (${formatHM(shift1Duration)})</td>
-        <td>${shift2Str}</td>
-        <td>${splitHours.toFixed(2)}h</td>
-        <td>${otBefore.toFixed(2)} / ${otBetween.toFixed(2)} / ${otAfter.toFixed(2)} h</td>
-        <td>${formatHM((shift1Duration + shift2Duration + (otBefore + otBetween + otAfter) * 60))}</td>
-        <td>${formatHM(shift1Duration + shift2Duration)}</td>
-        <td>${offDuty.toFixed(2)}h</td>
-        <td>${violation}</td>
-        <td>${formatHM(totalDutySum * 60)}</td>
-        <td><button onclick="this.parentElement.parentElement.remove(); recalculateTotals()">Delete</button></td>
-      `;
+  if (totalDutyWithBreaks > 14) violation = "Over 14h duty";
+  if (tet > 13) violation = "Over 13h TET";
 
-      document.getElementById("tableBody").appendChild(row);
-      dayCounter++;
-      document.querySelectorAll('input').forEach(el => el.value = "");
-    }
+  const tbody = document.querySelector("#resultTable tbody");
+  const row = document.createElement("tr");
+  row.innerHTML = `
+    <td>${dayCounter++}</td>
+    <td>${toFixedH(shift1Hours)}</td>
+    <td>${toFixedH(shift2Hours)}</td>
+    <td>${toFixedH(splitHours)}</td>
+    <td>${toFixedH(totalOvertime)}</td>
+    <td>${toFixedH(totalDutyWithBreaks)}</td>
+    <td>${toFixedH(tet)}</td>
+    <td>${toFixedH(offDuty)}</td>
+    <td>${violation}</td>
+  `;
+  tbody.appendChild(row);
 
-    function recalculateTotals() {
-      const rows = document.querySelectorAll("#tableBody tr");
-      let newTotal = 0;
-      rows.forEach((row, index) => {
-        const td = row.children;
-        const dutyText = td[5].innerText;
-        const duty = parseFloat(dutyText);
-        newTotal += duty;
-        td[0].innerText = index + 1;
-        td[9].innerText = formatHM(newTotal * 60);
-      });
-      dayCounter = rows.length + 1;
-    }
-  </script></body>
+  previousEndTime = s2End || s1End || 0;
+
+  // Clear inputs
+  document.querySelectorAll("input").forEach(i => i.value = "");
+}
+
+function downloadPDF() {
+  alert("PDF download not implemented in this version.");
+}
+</script>
+
+</body>
 </html>
