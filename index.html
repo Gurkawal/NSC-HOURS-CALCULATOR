@@ -1,32 +1,31 @@
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html><html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>NSC Service Hours Calculator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NSC Compliance Tracker</title>
   <style>
-    body { font-family: Arial, sans-serif; background-color: #f0f0f0; padding: 20px; }
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f8f9fa; }
     h1 { color: #333; }
-    label, input { display: block; margin: 5px 0; }
-    input[type="text"] { padding: 5px; width: 160px; }
-    button { margin-top: 10px; padding: 10px 20px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; }
+    input[type="time"], button { margin: 4px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background-color: #ddd; }
+    th { background-color: #f1f1f1; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    .violation { color: red; font-weight: bold; }
   </style>
 </head>
 <body>
-  <h1>NSC Service Hours Calculator</h1>
-  <form id="nscForm">
-    <label>Shift 1 Start (e.g., 0500): <input type="text" id="shift1Start"></label>
-    <label>Shift 1 End (e.g., 1300): <input type="text" id="shift1End"></label>
-    <label>Shift 2 Start (optional): <input type="text" id="shift2Start"></label>
-    <label>Shift 2 End (optional): <input type="text" id="shift2End"></label>
-    <label>OT Before Shift 1 (optional): <input type="text" id="otBefore"></label>
-    <label>OT Between Shifts (optional): <input type="text" id="otBetween"></label>
-    <label>OT After Shift 2 (optional): <input type="text" id="otAfter"></label>
-    <button type="submit">Submit Day</button>
-  </form>
-
+  <h1>NSC Compliance Tracker</h1>
+  <div>
+    <label>Shift 1 Start: <input type="time" id="shift1Start"></label>
+    <label>Shift 1 End: <input type="time" id="shift1End"></label>
+    <br>
+    <label>Shift 2 Start: <input type="time" id="shift2Start"></label>
+    <label>Shift 2 End: <input type="time" id="shift2End"></label>
+    <br>
+    <button onclick="submitDay()">Submit Day</button>
+    <button onclick="resetTracker()">Reset All</button>
+  </div>
   <table id="results">
     <thead>
       <tr>
@@ -42,136 +41,113 @@
         <th>Action</th>
       </tr>
     </thead>
-    <tbody></tbody>
-  </table>
+    <tbody id="resultBody"></tbody>
+  </table>  <script>
+    let shifts = [];
 
-  <script>
-    let results = [];
-    let lastEndMinutes = null;
-    let currentDay = 1;
-    let sevenDayWindow = [];
-    let totalOffDutyAccumulated = 0;
-
-    function timeToMinutes(timeStr) {
-      if (!timeStr) return null;
-      let time = parseInt(timeStr);
-      let hour = Math.floor(time / 100);
-      let minutes = time % 100;
-      return hour * 60 + minutes;
+    function toMinutes(timeStr) {
+      const [h, m] = timeStr.split(":").map(Number);
+      return h * 60 + m;
     }
 
-    function minutesToHours(mins) {
-      return (mins / 60).toFixed(2);
+    function formatTime(start, end) {
+      const startMin = toMinutes(start);
+      const endMin = toMinutes(end);
+      const dur = ((endMin + 1440 - startMin) % 1440) / 60;
+      return `${start} to ${end} (${dur.toFixed(2)}h)`;
     }
 
-    function duration(start, end) {
-      if (!start || !end) return 0;
-      let s = timeToMinutes(start);
-      let e = timeToMinutes(end);
-      if (e < s) e += 1440;
-      return e - s;
+    function calcHours(start, end) {
+      const s = toMinutes(start);
+      const e = toMinutes(end);
+      return ((e + 1440 - s) % 1440) / 60;
     }
 
-    function isCycleReset(offDutyMinutes) {
-      return offDutyMinutes >= 2160; // 36 hours
-    }
+    function submitDay() {
+      const s1Start = document.getElementById("shift1Start").value;
+      const s1End = document.getElementById("shift1End").value;
+      const s2Start = document.getElementById("shift2Start").value;
+      const s2End = document.getElementById("shift2End").value;
 
-    function calculateOffDuty(startMin) {
-      if (lastEndMinutes === null) return 1440;
-      if (startMin < lastEndMinutes) startMin += 1440;
-      return startMin - lastEndMinutes;
-    }
-
-    function renderTable() {
-      const tbody = document.querySelector("#results tbody");
-      tbody.innerHTML = "";
-      results.forEach((entry, index) => {
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${entry.day}</td>
-          <td>${entry.shift1}</td>
-          <td>${entry.shift2 || '-'}</td>
-          <td>${entry.splitHours}</td>
-          <td>${entry.otHours}</td>
-          <td>${entry.totalDuty}</td>
-          <td>${entry.tet}</td>
-          <td>${entry.offDuty}</td>
-          <td>${entry.violation}</td>
-          <td><button onclick="deleteEntry(${index})">Delete</button></td>
-        `;
-        tbody.appendChild(row);
-      });
-    }
-
-    function deleteEntry(index) {
-      results.splice(index, 1);
-      // Recalculate days
-      results.forEach((r, i) => r.day = i + 1);
-      currentDay = results.length + 1;
-      lastEndMinutes = results.length > 0 ? results[results.length - 1].endMin : null;
-      renderTable();
-    }
-
-    document.getElementById("nscForm").addEventListener("submit", function (e) {
-      e.preventDefault();
-      const s1s = document.getElementById("shift1Start").value;
-      const s1e = document.getElementById("shift1End").value;
-      const s2s = document.getElementById("shift2Start").value;
-      const s2e = document.getElementById("shift2End").value;
-      const ot1 = document.getElementById("otBefore").value;
-      const ot2 = document.getElementById("otBetween").value;
-      const ot3 = document.getElementById("otAfter").value;
-
-      const s1Min = timeToMinutes(s1s);
-      const s1EndMin = timeToMinutes(s1e);
-      const s2Min = timeToMinutes(s2s);
-      const s2EndMin = timeToMinutes(s2e);
-
-      const shift1Dur = duration(s1s, s1e);
-      const shift2Dur = (s2s && s2e) ? duration(s2s, s2e) : 0;
-      const splitDur = (s2s && s1e) ? duration(s1e, s2s) : 0;
-
-      const otBefore = ot1 && s1s ? duration(ot1, s1s) : 0;
-      const otBetween = s1e && ot2 ? duration(s1e, ot2) : 0;
-      const otAfter = (s2e || s1e) && ot3 ? duration(s2e || s1e, ot3) : 0;
-      const otTotal = otBefore + otBetween + otAfter;
-
-      const totalDuty = shift1Dur + shift2Dur + otTotal;
-      const tet = (s2e ? duration(s1s, s2e) : shift1Dur);
-
-      const offDuty = calculateOffDuty(s1Min);
-
-      if (isCycleReset(offDuty)) {
-        sevenDayWindow = [];
-        totalOffDutyAccumulated = 0;
+      if (!s1Start || !s1End) {
+        alert("Shift 1 is required.");
+        return;
       }
-      totalOffDutyAccumulated += offDuty;
-      sevenDayWindow.push(totalDuty / 60);
-      if (sevenDayWindow.length > 7) sevenDayWindow.shift();
 
-      let violations = [];
-      if (totalDuty / 60 > 14) violations.push("Duty > 14h");
-      if (tet / 60 > 16) violations.push("TET > 16h");
-      if (offDuty < 480) violations.push("Off-duty <8h");
-      if (sevenDayWindow.reduce((a, b) => a + b, 0) > 70) violations.push(">70h/7 days");
+      let shift1Hours = calcHours(s1Start, s1End);
+      let shift2Hours = s2Start && s2End ? calcHours(s2Start, s2End) : 0;
+      let splitHours = s2Start ? calcHours(s1End, s2Start) : 0;
+      let totalDuty = shift1Hours + shift2Hours;
+      let tet = totalDuty + splitHours;
 
-      results.push({
-        day: currentDay++,
-        shift1: `${s1s} to ${s1e} (${minutesToHours(shift1Dur)}h)`,
-        shift2: s2s && s2e ? `${s2s} to ${s2e} (${minutesToHours(shift2Dur)}h)` : '',
-        splitHours: `${minutesToHours(splitDur)}h`,
-        otHours: `${minutesToHours(otBefore)} / ${minutesToHours(otBetween)} / ${minutesToHours(otAfter)} h`,
-        totalDuty: `${minutesToHours(totalDuty)}h`,
-        tet: `${minutesToHours(tet)}h`,
-        offDuty: `${minutesToHours(offDuty)}h`,
-        violation: violations.length ? violations.join(", ") : "None",
-        endMin: s2EndMin || s1EndMin
+      let prev = shifts[shifts.length - 1];
+      let prevEnd = prev ? prev.endTime : null;
+      let currStart = s1Start;
+
+      let offDuty = 24.0;
+      let violation = "None";
+
+      if (prevEnd) {
+        let prevMinutes = toMinutes(prevEnd);
+        let currMinutes = toMinutes(currStart);
+        let offMin = (currMinutes + 1440 - prevMinutes) % 1440;
+        if (offMin < 480) {
+          violation = "Off-duty <8h";
+        }
+        offDuty = (offMin / 60).toFixed(2);
+      }
+
+      const newShift = {
+        day: shifts.length + 1,
+        shift1: formatTime(s1Start, s1End),
+        shift2: s2Start && s2End ? formatTime(s2Start, s2End) : "-",
+        split: splitHours.toFixed(2) + "h",
+        overtime: "0.00 / 0.00 / 0.00 h",
+        duty: totalDuty.toFixed(2) + "h",
+        tet: tet.toFixed(2) + "h",
+        offDuty: offDuty + "h",
+        violation: violation,
+        endTime: s2End || s1End
+      };
+
+      shifts.push(newShift);
+      render();
+      document.getElementById("shift1Start").value = "";
+      document.getElementById("shift1End").value = "";
+      document.getElementById("shift2Start").value = "";
+      document.getElementById("shift2End").value = "";
+    }
+
+    function render() {
+      const body = document.getElementById("resultBody");
+      body.innerHTML = "";
+      shifts.forEach((s, i) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${s.day}</td>
+          <td>${s.shift1}</td>
+          <td>${s.shift2}</td>
+          <td>${s.split}</td>
+          <td>${s.overtime}</td>
+          <td>${s.duty}</td>
+          <td>${s.tet}</td>
+          <td>${s.offDuty}</td>
+          <td class="${s.violation !== 'None' ? 'violation' : ''}">${s.violation}</td>
+          <td><button onclick="deleteDay(${i})">Delete</button></td>
+        `;
+        body.appendChild(tr);
       });
+    }
 
-      lastEndMinutes = s2EndMin || s1EndMin;
-      document.getElementById("nscForm").reset();
-      renderTable();
-    });
-  </script>
-</body>
+    function deleteDay(index) {
+      shifts.splice(index, 1);
+      shifts.forEach((s, i) => s.day = i + 1);
+      render();
+    }
+
+    function resetTracker() {
+      shifts = [];
+      render();
+    }
+  </script></body>
 </html>
