@@ -61,8 +61,7 @@
     }
 
     function duration(start, end) {
-      if (start === null || end === null) return 0;
-      if (end < start) end += 2400;
+      if (!start || !end) return 0;
       let s = timeToMinutes(start);
       let e = timeToMinutes(end);
       if (e < s) e += 1440;
@@ -82,7 +81,12 @@
       let shift1Mins = duration(s1s, s1e);
       let shift2Mins = s2s && s2e ? duration(s2s, s2e) : 0;
       let splitMins = s2s ? duration(s1e, s2s) : 0;
-      let otMins = duration(ot1, s1s) + duration(s1e, ot2) + duration(s2e || s1e, ot3);
+
+      let otBeforeMins = ot1 && s1s ? duration(ot1, s1s) : 0;
+      let otBetweenMins = s1e && ot2 ? duration(s1e, ot2) : 0;
+      let otAfterMins = (s2e || s1e) && ot3 ? duration(s2e || s1e, ot3) : 0;
+      let otMins = otBeforeMins + otBetweenMins + otAfterMins;
+
       let totalDutyMins = shift1Mins + shift2Mins + otMins;
       let tet = s2e ? duration(s1s, s2e) : shift1Mins;
 
