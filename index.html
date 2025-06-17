@@ -41,7 +41,6 @@
   <input type="text" id="otAfter"><br>
 
   <button onclick="submitDay()">Submit Day</button>
-  <button onclick="downloadPDF()">Download PDF</button>
 
   <table id="results">
     <thead>
@@ -65,12 +64,11 @@
 
   <script>
     const entries = [];
-    let cumulativeDuty = 0;
 
     function parseTime(str) {
       if (!str) return null;
-      let hour = parseInt(str.slice(0, 2), 10);
-      let min = parseInt(str.slice(2), 10);
+      const hour = parseInt(str.slice(0, 2), 10);
+      const min = parseInt(str.slice(2), 10);
       return hour + min / 60;
     }
 
@@ -103,46 +101,51 @@
       const splitHours = (s1End != null && s2Start != null) ? ((s2Start - s1End + 24) % 24) : 0;
       const totalDuty = shift1Duration + shift2Duration + otBefore + otBetween + otAfter;
       const TET = shift1Duration + shift2Duration;
-      const TETStart = s1Start != null ? s1Start : s2Start;
-      const TETEnd = s2End != null ? s2End : s1End;
-
-      cumulativeDuty += totalDuty;
-
       const dayNumber = entries.length + 1;
+      const endTime = s2End != null ? s2End : s1End;
+      const startTime = s1Start != null ? s1Start : s2Start;
+
       let offDuty = 24;
       let violation = "None";
 
+      // Accurate off-duty calculation using datetime
       if (entries.length > 0) {
         const prev = entries[entries.length - 1];
-        const prevEnd = prev.endTime;
-        const todayStart = s1Start != null ? s1Start : s2Start;
-        const timeGap = (todayStart - prevEnd + 24) % 24;
-        offDuty = timeGap;
 
-        // Reset if it's a new calendar date and 24+ hours passed
-        if (prev.date !== date && timeGap >= 24) {
-          offDuty = 24;
-          violation = "None";
-        } else if (offDuty < 8) {
-          violation = "Off-duty <8h";
-        }
+        const prevEnd = new Date(prev.date + "T00:00");
+        prevEnd.setHours(Math.floor(prev.endTime));
+        prevEnd.setMinutes(Math.round((prev.endTime % 1) * 60));
+
+        const currStart = new Date(date + "T00:00");
+        currStart.setHours(Math.floor(startTime));
+        currStart.setMinutes(Math.round((startTime % 1) * 60));
+
+        if (currStart <= prevEnd) currStart.setDate(currStart.getDate() + 1);
+
+        const diff = (currStart - prevEnd) / (1000 * 60 * 60);
+        offDuty = diff;
+
+        if (offDuty < 8) violation = "Off-duty <8h";
       }
 
       if (totalDuty > 14) violation = "Over 14h duty";
       if (TET > 16) violation = "Over 16h TET";
 
-      const endTime = s2End != null ? s2End : s1End;
+      let cumulativeDuty = totalDuty;
+      if (entries.length > 0) {
+        cumulativeDuty += parseFloat(entries[entries.length - 1].cumulativeDuty);
+      }
 
       entries.push({
-        date,
         dayNumber,
+        date,
         shift1: formatTimeRange(s1Start, s1End),
         shift2: formatTimeRange(s2Start, s2End),
         splitHours: splitHours.toFixed(2) + "h",
         overtime: `${otBefore.toFixed(2)} / ${otBetween.toFixed(2)} / ${otAfter.toFixed(2)} h`,
         totalDuty: totalDuty.toFixed(2) + "h",
-        cumulativeDuty: cumulativeDuty.toFixed(2) + "h",
-        TET: `${formatTime24To12(TETStart)} to ${formatTime24To12(TETEnd)} (${TET.toFixed(2)}h)`,
+        cumulativeDuty: cumulativeDuty.toFixed(2),
+        TETRange: formatTimeRange(startTime, endTime),
         offDuty: offDuty.toFixed(2) + "h",
         violation,
         endTime
@@ -165,8 +168,8 @@
           <td>${entry.splitHours}</td>
           <td>${entry.overtime}</td>
           <td>${entry.totalDuty}</td>
-          <td>${entry.cumulativeDuty}</td>
-          <td>${entry.TET}</td>
+          <td>${entry.cumulativeDuty}h</td>
+          <td>${entry.TETRange}</td>
           <td>${entry.offDuty}</td>
           <td>${entry.violation}</td>
           <td><button onclick="deleteEntry(${i})">Delete</button></td>
@@ -176,7 +179,6 @@
     }
 
     function deleteEntry(index) {
-      cumulativeDuty -= parseFloat(entries[index].totalDuty);
       entries.splice(index, 1);
       entries.forEach((e, i) => e.dayNumber = i + 1);
       renderTable();
@@ -191,10 +193,6 @@
       document.getElementById("otBefore").value = "";
       document.getElementById("otBetween").value = "";
       document.getElementById("otAfter").value = "";
-    }
-
-    function downloadPDF() {
-      alert("PDF export feature coming soon.");
     }
   </script>
 </body>
