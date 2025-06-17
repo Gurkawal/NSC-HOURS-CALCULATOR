@@ -149,13 +149,18 @@
       return `${pad(start)} - ${pad(end)}`;
     }
 
+    function dateToObj(dateStr) {
+      const [year, month, day] = dateStr.split('-');
+      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+
     function getCumulative(days, currentDate) {
-      const current = new Date(currentDate);
+      const current = dateToObj(currentDate);
       return entries
         .filter(e => {
-          const d = new Date(e.date);
+          const d = dateToObj(e.date);
           const diff = (current - d) / (1000 * 60 * 60 * 24);
-          return diff <= (days - 1);
+          return diff >= 0 && diff <= (days - 1);
         })
         .reduce((sum, e) => sum + e.totalDuty, 0);
     }
