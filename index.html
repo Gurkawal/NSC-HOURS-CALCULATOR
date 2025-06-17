@@ -1,4 +1,5 @@
-<!DOCTYPE html><html>
+<!DOCTYPE html>
+<html>
 <head>
   <meta charset="UTF-8">
   <title>NSC Service Hours Calculator</title>
@@ -26,24 +27,27 @@
     <label>Overtime Between Shifts (optional): <input type="text" id="otBetween"></label>
     <label>Overtime After Shift 2 (optional): <input type="text" id="otAfter"></label>
     <button type="submit">Submit Day</button>
-  </form><button onclick="downloadPDF()">Download PDF</button>
+  </form>
+  <button onclick="downloadPDF()">Download PDF</button>
 
   <table id="results">
     <thead>
       <tr>
         <th>Day</th>
-        <th>Shift 1 Hours (Start-End)</th>
-        <th>Shift 2 Hours (Start-End)</th>
+        <th>Shift 1</th>
+        <th>Shift 2</th>
         <th>Split Hours</th>
-        <th>Overtime Total</th>
-        <th>Total Duty Hours</th>
+        <th>Overtime (Before/Between/After)</th>
+        <th>Total Duty</th>
         <th>TET</th>
-        <th>Off-Duty Hours</th>
+        <th>Off-Duty</th>
         <th>NSC Violation</th>
       </tr>
     </thead>
     <tbody></tbody>
-  </table>  <script>
+  </table>
+
+  <script>
     let lastDayEnd = null;
     let currentDay = 1;
     let sevenDayWindow = [];
@@ -114,20 +118,24 @@
 
       let violation = [];
       if (totalDutyMins / 60 > 14) violation.push("Over 14h duty");
-      if (tet / 60 > 16) violation.push("TET over 16h");
-      if (offDuty < 480) violation.push("<8h off-duty");
+      if (tet / 60 > 16) violation.push("TET >16h");
+      if (offDuty < 480) violation.push("Off-duty <8h");
 
       lastDayEnd = timeToMinutes(s2e || s1e);
       sevenDayWindow.push(totalDutyMins / 60);
       if (sevenDayWindow.length > 7) sevenDayWindow.shift();
-      if (sevenDayWindow.reduce((a, b) => a + b, 0) > 70) violation.push(">70h in 7 days");
+      if (sevenDayWindow.reduce((a, b) => a + b, 0) > 70) violation.push("70h/7d");
 
       let row = `<tr>
         <td>${currentDay - 1}</td>
         <td>${s1s || "-"} to ${s1e || "-"} (${minutesToHours(shift1Mins)}h)</td>
         <td>${s2s && s2e ? `${s2s} to ${s2e} (${minutesToHours(shift2Mins)}h)` : "-"}</td>
         <td>${minutesToHours(splitMins)}h</td>
-        <td>${minutesToHours(otMins)}h</td>
+        <td>
+          ${minutesToHours(otBeforeMins)} / 
+          ${minutesToHours(otBetweenMins)} / 
+          ${minutesToHours(otAfterMins)} h
+        </td>
         <td>${minutesToHours(totalDutyMins)}h</td>
         <td>${minutesToHours(tet)}h</td>
         <td>${minutesToHours(offDuty)}h</td>
@@ -151,5 +159,6 @@
       doc.addImage(imgData, "PNG", 10, 20, pdfWidth - 20, pdfHeight);
       doc.save("NSC_Service_Hours.pdf");
     }
-  </script></body>
+  </script>
+</body>
 </html>
