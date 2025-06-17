@@ -1,49 +1,50 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>NSC Service Hours Calculator</title>
   <style>
-    body { font-family: Arial; padding: 20px; background: #f2f2f2; }
-    table { border-collapse: collapse; width: 100%; background: white; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
-    input { margin-bottom: 5px; }
-    label { display: block; margin-top: 10px; font-weight: bold; }
-    .form-row { margin-bottom: 10px; }
-    button { margin-top: 10px; }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f0f0f0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background: #fff;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background: #eee;
+    }
+    input {
+      margin: 5px 0;
+      width: 100%;
+      padding: 6px;
+    }
+    button {
+      padding: 10px 15px;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
   <h2>NSC Service Hours Calculator</h2>
-
-  <label for="date">Date:</label>
-  <input type="date" id="date"><br>
-
-  <label>Shift 1 Start (e.g., 0500):</label>
-  <input type="text" id="shift1Start"><br>
-
-  <label>Shift 1 End (e.g., 1300):</label>
-  <input type="text" id="shift1End"><br>
-
-  <label>Shift 2 Start (optional):</label>
-  <input type="text" id="shift2Start"><br>
-
-  <label>Shift 2 End (optional):</label>
-  <input type="text" id="shift2End"><br>
-
-  <label>Overtime Before Shift 1 (optional):</label>
-  <input type="text" id="otBefore"><br>
-
-  <label>Overtime Between Shifts (optional):</label>
-  <input type="text" id="otBetween"><br>
-
-  <label>Overtime After Shift 2 (optional):</label>
-  <input type="text" id="otAfter"><br>
-
+  <label>Date (YYYY-MM-DD): <input type="date" id="date"></label><br>
+  <label>Shift 1 Start (e.g., 0500): <input id="shift1Start"></label><br>
+  <label>Shift 1 End (e.g., 1300): <input id="shift1End"></label><br>
+  <label>Shift 2 Start (optional): <input id="shift2Start"></label><br>
+  <label>Shift 2 End (optional): <input id="shift2End"></label><br>
+  <label>Overtime Before Shift 1 (optional): <input id="otBefore"></label><br>
+  <label>Overtime Between Shifts (optional): <input id="otBetween"></label><br>
+  <label>Overtime After Shift 2 (optional): <input id="otAfter"></label><br>
   <button onclick="submitDay()">Submit Day</button>
-  <button onclick="downloadPDF()">Download PDF</button>
-
-  <table id="results">
+  <table id="resultTable">
     <thead>
       <tr>
         <th>Day</th>
@@ -59,124 +60,126 @@
         <th>Action</th>
       </tr>
     </thead>
-    <tbody></tbody>
-  </table>
+    <tbody id="logBody"></tbody>
+  </table>  <script>
+    let logs = [];
 
-  <script>
-    const entries = [];
-
-    function parseTime(str) {
-      if (!str) return null;
-      let hour = parseInt(str.slice(0, 2), 10);
-      let min = parseInt(str.slice(2), 10);
-      return hour + min / 60;
+    function toMinutes(hhmm) {
+      const h = parseInt(hhmm.slice(0, -2));
+      const m = parseInt(hhmm.slice(-2));
+      return h * 60 + m;
     }
 
-    function formatTime24To12(time24) {
-      const hours = Math.floor(time24) % 24;
-      const minutes = Math.round((time24 % 1) * 60);
-      const suffix = hours >= 12 ? "PM" : "AM";
-      const displayHour = ((hours + 11) % 12 + 1);
-      return `${displayHour}:${minutes.toString().padStart(2, "0")} ${suffix}`;
+    function formatTime(m) {
+      const h = Math.floor(m / 60);
+      const min = m % 60;
+      const suffix = h >= 12 ? 'PM' : 'AM';
+      const stdH = ((h + 11) % 12 + 1);
+      return `${stdH}:${min.toString().padStart(2, '0')} ${suffix}`;
     }
 
-    function formatTimeRange(start, end) {
-      if (start == null || end == null) return "-";
-      const duration = (end >= start ? end - start : 24 + end - start);
-      return `${formatTime24To12(start)} to ${formatTime24To12(end)} (${duration.toFixed(2)}h)`;
+    function formatShift(start, end) {
+      const sMin = toMinutes(start);
+      const eMin = toMinutes(end);
+      const dur = (eMin >= sMin ? eMin - sMin : eMin + 1440 - sMin) / 60;
+      return `${formatTime(sMin)} to ${formatTime(eMin)} (${dur.toFixed(2)}h)`;
+    }
+
+    function calcDuration(start, end) {
+      const sMin = toMinutes(start);
+      const eMin = toMinutes(end);
+      return (eMin >= sMin ? eMin - sMin : eMin + 1440 - sMin) / 60;
     }
 
     function submitDay() {
       const date = document.getElementById("date").value;
-      const s1Start = parseTime(document.getElementById("shift1Start").value);
-      const s1End = parseTime(document.getElementById("shift1End").value);
-      const s2Start = parseTime(document.getElementById("shift2Start").value);
-      const s2End = parseTime(document.getElementById("shift2End").value);
+      const s1Start = document.getElementById("shift1Start").value;
+      const s1End = document.getElementById("shift1End").value;
+      const s2Start = document.getElementById("shift2Start").value;
+      const s2End = document.getElementById("shift2End").value;
       const otBefore = parseFloat(document.getElementById("otBefore").value) || 0;
       const otBetween = parseFloat(document.getElementById("otBetween").value) || 0;
       const otAfter = parseFloat(document.getElementById("otAfter").value) || 0;
 
-      const shift1Duration = (s1Start != null && s1End != null) ? ((s1End - s1Start + 24) % 24) : 0;
-      const shift2Duration = (s2Start != null && s2End != null) ? ((s2End - s2Start + 24) % 24) : 0;
-      const splitHours = (s1End != null && s2Start != null) ? ((s2Start - s1End + 24) % 24) : 0;
-      const totalDuty = shift1Duration + shift2Duration + otBefore + otBetween + otAfter;
-      const TET = shift1Duration + shift2Duration;
-      const dayNumber = entries.length + 1;
+      if (!date || !s1Start || !s1End) return alert("Please enter date and shift 1 start/end");
 
-      let offDuty = 24;
-      let violation = "None";
+      const shift1Dur = calcDuration(s1Start, s1End);
+      let shift2Dur = 0;
+      let splitHours = 0;
+      let shift2Display = "-";
 
-      if (entries.length > 0) {
-        const prev = entries[entries.length - 1];
-        const prevEnd = prev.endTime;
-        const todayStart = s1Start != null ? s1Start : s2Start;
-        const timeGap = (todayStart - prevEnd + 24) % 24;
-        offDuty = timeGap;
-
-        if (offDuty < 8) violation = "Off-duty <8h";
+      if (s2Start && s2End) {
+        shift2Dur = calcDuration(s2Start, s2End);
+        splitHours = (toMinutes(s2Start) - toMinutes(s1End)) / 60;
+        shift2Display = formatShift(s2Start, s2End);
       }
 
+      const totalDuty = shift1Dur + shift2Dur + otBefore + otBetween + otAfter;
+      const tet = shift1Dur + shift2Dur;
+
+      let offDuty = 0;
+      if (logs.length > 0) {
+        const lastLog = logs[logs.length - 1];
+        const prevEnd = new Date(`${lastLog.date}T00:00:00`);
+        prevEnd.setMinutes(prevEnd.getMinutes() + lastLog.endMin);
+
+        const currStart = new Date(`${date}T00:00:00`);
+        currStart.setMinutes(currStart.getMinutes() + toMinutes(s1Start));
+
+        offDuty = (currStart - prevEnd) / (1000 * 60 * 60);
+      } else {
+        offDuty = 24;
+      }
+
+      let violation = "None";
       if (totalDuty > 14) violation = "Over 14h duty";
-      if (TET > 16) violation = "Over 16h TET";
+      else if (tet > 13) violation = "Over 13h TET";
+      else if (offDuty < 8) violation = "Off-duty <8h";
 
-      const endTime = s2End != null ? s2End : s1End;
-
-      entries.push({ date, dayNumber, shift1: formatTimeRange(s1Start, s1End), shift2: formatTimeRange(s2Start, s2End), 
-        splitHours: splitHours.toFixed(2) + "h", 
+      const log = {
+        day: logs.length + 1,
+        date,
+        shift1: formatShift(s1Start, s1End),
+        shift2: shift2Display,
+        split: splitHours.toFixed(2) + "h",
         overtime: `${otBefore.toFixed(2)} / ${otBetween.toFixed(2)} / ${otAfter.toFixed(2)} h`,
         totalDuty: totalDuty.toFixed(2) + "h",
-        TET: TET.toFixed(2) + "h",
+        tet: tet.toFixed(2) + "h",
         offDuty: offDuty.toFixed(2) + "h",
         violation,
-        endTime
-      });
+        endMin: toMinutes(s2End || s1End)
+      };
 
+      logs.push(log);
       renderTable();
-      clearInputs();
     }
 
     function renderTable() {
-      const tbody = document.querySelector("#results tbody");
+      const tbody = document.getElementById("logBody");
       tbody.innerHTML = "";
-      entries.forEach((entry, i) => {
+      logs.forEach((log, i) => {
         const row = document.createElement("tr");
         row.innerHTML = `
-          <td>${entry.dayNumber}</td>
-          <td>${entry.date}</td>
-          <td>${entry.shift1}</td>
-          <td>${entry.shift2}</td>
-          <td>${entry.splitHours}</td>
-          <td>${entry.overtime}</td>
-          <td>${entry.totalDuty}</td>
-          <td>${entry.TET}</td>
-          <td>${entry.offDuty}</td>
-          <td>${entry.violation}</td>
-          <td><button onclick="deleteEntry(${i})">Delete</button></td>
+          <td>${log.day}</td>
+          <td>${log.date}</td>
+          <td>${log.shift1}</td>
+          <td>${log.shift2}</td>
+          <td>${log.split}</td>
+          <td>${log.overtime}</td>
+          <td>${log.totalDuty}</td>
+          <td>${log.tet}</td>
+          <td>${log.offDuty}</td>
+          <td>${log.violation}</td>
+          <td><button onclick="deleteRow(${i})">Delete</button></td>
         `;
         tbody.appendChild(row);
       });
     }
 
-    function deleteEntry(index) {
-      entries.splice(index, 1);
-      entries.forEach((e, i) => e.dayNumber = i + 1); // renumber days
+    function deleteRow(index) {
+      logs.splice(index, 1);
+      logs.forEach((log, i) => log.day = i + 1);
       renderTable();
     }
-
-    function clearInputs() {
-      document.getElementById("date").value = "";
-      document.getElementById("shift1Start").value = "";
-      document.getElementById("shift1End").value = "";
-      document.getElementById("shift2Start").value = "";
-      document.getElementById("shift2End").value = "";
-      document.getElementById("otBefore").value = "";
-      document.getElementById("otBetween").value = "";
-      document.getElementById("otAfter").value = "";
-    }
-
-    function downloadPDF() {
-      alert("PDF export will be added soon.");
-    }
-  </script>
-</body>
+  </script></body>
 </html>
