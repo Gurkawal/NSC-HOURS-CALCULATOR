@@ -23,9 +23,12 @@
       text-align: center;
       color: #007bff;
     }
+    .form-section {
+      margin-bottom: 20px;
+    }
     .form-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
       gap: 15px;
     }
     label {
@@ -90,15 +93,35 @@
       </select>
     </div>
 
-    <div class="form-grid">
-      <div><label>Date:</label><input type="date" id="date"></div>
-      <div><label>Shift 1 Start (e.g., 0500):</label><input type="text" id="shift1Start"></div>
-      <div><label>Shift 1 End (e.g., 1300):</label><input type="text" id="shift1End"></div>
-      <div><label>Shift 2 Start (optional):</label><input type="text" id="shift2Start"></div>
-      <div><label>Shift 2 End (optional):</label><input type="text" id="shift2End"></div>
-      <div><label>OT Before Shift 1:</label><input type="text" id="otBefore"></div>
-      <div><label>OT Between Shifts:</label><input type="text" id="otBetween"></div>
-      <div><label>OT After Shift 2:</label><input type="text" id="otAfter"></div>
+    <div class="form-section">
+      <div class="form-grid">
+        <div><label>Date:</label><input type="date" id="date"></div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h4>Shift 1</h4>
+      <div class="form-grid">
+        <div><label>Start Time (e.g., 0530):</label><input type="text" id="shift1Start"></div>
+        <div><label>End Time (e.g., 1230):</label><input type="text" id="shift1End"></div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h4>Shift 2 (optional)</h4>
+      <div class="form-grid">
+        <div><label>Start Time:</label><input type="text" id="shift2Start"></div>
+        <div><label>End Time:</label><input type="text" id="shift2End"></div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h4>Overtime</h4>
+      <div class="form-grid">
+        <div><label>Before Shift 1 (e.g., 0430 to 0500):</label><input type="text" id="otBeforeTime"></div>
+        <div><label>Between Shifts (e.g., 1400 to 1500):</label><input type="text" id="otBetweenTime"></div>
+        <div><label>After Shift 2 (e.g., 1900 to 2000):</label><input type="text" id="otAfterTime"></div>
+      </div>
     </div>
 
     <div class="button-group">
@@ -131,10 +154,21 @@
     const entries = [];
 
     function parseTime(str) {
-      if (!str) return null;
+      if (!str || str.length < 3) return null;
       const hour = parseInt(str.slice(0, 2), 10);
       const min = parseInt(str.slice(2), 10);
       return hour + min / 60;
+    }
+
+    function timeDiff(start, end) {
+      if (start == null || end == null) return 0;
+      return (end - start + 24) % 24;
+    }
+
+    function parseOT(str) {
+      if (!str.includes("to")) return 0;
+      const [start, end] = str.split("to").map(s => s.trim());
+      return timeDiff(parseTime(start), parseTime(end));
     }
 
     function formatTime24To12(time24) {
@@ -147,153 +181,91 @@
 
     function formatTimeRange(start, end) {
       if (start == null || end == null) return "-";
-      const duration = (end >= start ? end - start : 24 + end - start);
+      const duration = timeDiff(start, end);
       return `${formatTime24To12(start)} - ${formatTime24To12(end)} (${duration.toFixed(2)}h)`;
     }
 
-    function getCumulative(cycleDays) {
+    function getCumulative(days) {
       const today = new Date(entries[entries.length - 1].date);
-      let total = 0;
-      entries.forEach(e => {
-        const entryDate = new Date(e.date);
-        const diff = (today - entryDate) / (1000 * 60 * 60 * 24);
-        if (diff < cycleDays) {
-          total += parseFloat(e.totalDuty);
-        }
-      });
-      return total;
+      return entries
+        .filter(e => {
+          const d = new Date(e.date);
+          const diff = (today - d) / (1000 * 60 * 60 * 24);
+          return diff <= (days - 1);
+        })
+        .reduce((sum, e) => sum + e.totalDuty, 0);
     }
 
     function submitDay() {
       const date = document.getElementById("date").value;
-      const s1Start = parseTime(document.getElementById("shift1Start").value);
-      const s1End = parseTime(document.getElementById("shift1End").value);
-      const s2Start = parseTime(document.getElementById("shift2Start").value);
-      const s2End = parseTime(document.getElementById("shift2End").value);
-      const otBefore = parseFloat(document.getElementById("otBefore").value) || 0;
-      const otBetween = parseFloat(document.getElementById("otBetween").value) || 0;
-      const otAfter = parseFloat(document.getElementById("otAfter").value) || 0;
+      const shift1Start = parseTime(document.getElementById("shift1Start").value);
+      const shift1End = parseTime(document.getElementById("shift1End").value);
+      const shift2Start = parseTime(document.getElementById("shift2Start").value);
+      const shift2End = parseTime(document.getElementById("shift2End").value);
+      const otBefore = parseOT(document.getElementById("otBeforeTime").value);
+      const otBetween = parseOT(document.getElementById("otBetweenTime").value);
+      const otAfter = parseOT(document.getElementById("otAfterTime").value);
       const cycle = document.getElementById("cycle").value;
 
-      const shift1Duration = (s1Start != null && s1End != null) ? ((s1End - s1Start + 24) % 24) : 0;
-      const shift2Duration = (s2Start != null && s2End != null) ? ((s2End - s2Start + 24) % 24) : 0;
-      const splitHours = (s1End != null && s2Start != null) ? ((s2Start - s1End + 24) % 24) : 0;
-      const totalDuty = shift1Duration + shift2Duration + otBefore + otBetween + otAfter;
-      const TET = shift1Duration + shift2Duration;
+      const shift1Hours = timeDiff(shift1Start, shift1End);
+      const shift2Hours = timeDiff(shift2Start, shift2End);
+      const splitHours = shift2Start ? timeDiff(shift1End, shift2Start) : 0;
+      const totalDuty = shift1Hours + shift2Hours + otBefore + otBetween + otAfter;
+      const tet = shift2End ? timeDiff(shift1Start, shift2End) : shift1Hours;
+      const offDuty = 24 - tet;
+      const cumulative = cycle === "1" ? getCumulative(7) + totalDuty : getCumulative(14) + totalDuty;
 
-      const startTime = s1Start != null ? s1Start : s2Start;
-      const endTime = s2End != null ? s2End : s1End;
+      const violation = (totalDuty > 14 || tet > 16 || (cycle === "1" && cumulative > 70) || (cycle === "2" && cumulative > 120)) ? "YES" : "";
 
-      let offDuty = 24;
-      let violation = "None";
-
-      if (entries.length > 0) {
-        const prev = entries[entries.length - 1];
-        const prevEnd = new Date(prev.date + "T00:00");
-        prevEnd.setHours(Math.floor(prev.endTime));
-        prevEnd.setMinutes(Math.round((prev.endTime % 1) * 60));
-
-        const currStart = new Date(date + "T00:00");
-        currStart.setHours(Math.floor(startTime));
-        currStart.setMinutes(Math.round((startTime % 1) * 60));
-
-        if (currStart <= prevEnd) currStart.setDate(currStart.getDate() + 1);
-
-        const diff = (currStart - prevEnd) / (1000 * 60 * 60);
-        offDuty = diff;
-
-        if (offDuty < 8) violation = "Off-duty <8h";
-      }
-
-      if (totalDuty > 14) violation = "Over 14h duty";
-      if (TET > 16) violation = "Over 16h TET";
-
-      const cycleLimit = cycle === "1" ? 70 : 120;
-      const cycleDays = cycle === "1" ? 7 : 14;
-      const cumulativeDuty = getCumulative(cycleDays) + totalDuty;
-
-      if (cumulativeDuty > cycleLimit) violation = `Over ${cycleLimit}h / ${cycleDays}d`;
-
-      entries.push({
-        dayNumber: entries.length + 1,
-        date,
-        shift1: formatTimeRange(s1Start, s1End),
-        shift2: formatTimeRange(s2Start, s2End),
-        splitHours: splitHours.toFixed(2) + "h",
-        overtime: `${otBefore.toFixed(2)} / ${otBetween.toFixed(2)} / ${otAfter.toFixed(2)} h`,
-        totalDuty: totalDuty.toFixed(2),
-        cumulativeDuty: cumulativeDuty.toFixed(2),
-        TETRange: (() => {
-          if (startTime == null) return "-";
-          const endTET = (startTime + 16) % 24;
-          return `${formatTime24To12(startTime)} - ${formatTime24To12(endTET)} (16h)`;
-        })(),
-        offDuty: offDuty.toFixed(2) + "h",
-        violation,
-        endTime
-      });
+      entries.push({ date, shift1Start, shift1End, shift2Start, shift2End, splitHours, otBefore, otBetween, otAfter, totalDuty, cumulative, tet, offDuty, violation });
 
       renderTable();
-      document.querySelectorAll("input").forEach(i => i.value = "");
     }
 
     function renderTable() {
       const tbody = document.querySelector("#results tbody");
       tbody.innerHTML = "";
-      entries.forEach((entry, i) => {
-        const row = document.createElement("tr");
+      entries.forEach((e, i) => {
+        const row = tbody.insertRow();
         row.innerHTML = `
-          <td>${entry.dayNumber}</td>
-          <td>${entry.date}</td>
-          <td>${entry.shift1}</td>
-          <td>${entry.shift2}</td>
-          <td>${entry.splitHours}</td>
-          <td>${entry.overtime}</td>
-          <td>${entry.totalDuty}h</td>
-          <td>${entry.cumulativeDuty}h</td>
-          <td>${entry.TETRange}</td>
-          <td>${entry.offDuty}</td>
-          <td>${entry.violation}</td>
-          <td><button onclick="deleteEntry(${i})">X</button></td>
+          <td>${i + 1}</td>
+          <td>${e.date}</td>
+          <td>${formatTimeRange(e.shift1Start, e.shift1End)}</td>
+          <td>${e.shift2Start ? formatTimeRange(e.shift2Start, e.shift2End) : "-"}</td>
+          <td>${e.splitHours.toFixed(2)}</td>
+          <td>${e.otBefore.toFixed(2)} / ${e.otBetween.toFixed(2)} / ${e.otAfter.toFixed(2)}</td>
+          <td>${e.totalDuty.toFixed(2)}</td>
+          <td>${e.cumulative.toFixed(2)}</td>
+          <td>${e.tet.toFixed(2)}</td>
+          <td>${e.offDuty.toFixed(2)}</td>
+          <td>${e.violation}</td>
+          <td><button onclick="removeRow(${i})">Delete</button></td>
         `;
-        tbody.appendChild(row);
       });
     }
 
-    function deleteEntry(index) {
+    function removeRow(index) {
       entries.splice(index, 1);
-      entries.forEach((e, i) => e.dayNumber = i + 1);
       renderTable();
     }
 
     function downloadPDF() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
-      doc.setFontSize(12);
-      doc.text("NSC Hours Report", 14, 14);
-      let y = 22;
-
-      entries.forEach(e => {
-        const lines = [
-          `Day ${e.dayNumber} - ${e.date}`,
-          `Shift 1: ${e.shift1}`,
-          `Shift 2: ${e.shift2}`,
-          `OT (Before/Between/After): ${e.overtime}`,
-          `Split: ${e.splitHours} | TET: ${e.TETRange}`,
-          `Total Duty: ${e.totalDuty}h | Cumulative: ${e.cumulativeDuty}h`,
-          `Off-Duty: ${e.offDuty} | Violation: ${e.violation}`
-        ];
-        lines.forEach(line => {
-          doc.text(line, 14, y);
-          y += 6;
-        });
-        y += 4;
+      doc.text("NSC Shift Report", 15, 10);
+      let y = 20;
+      entries.forEach((e, i) => {
+        doc.text(
+          `${i + 1}. ${e.date} | Duty: ${e.totalDuty.toFixed(2)}h | Cumulative: ${e.cumulative.toFixed(2)}h | Violation: ${e.violation || "No"}`,
+          10,
+          y
+        );
+        y += 10;
         if (y > 270) {
           doc.addPage();
           y = 20;
         }
       });
-
       doc.save("NSC_Report.pdf");
     }
   </script>
