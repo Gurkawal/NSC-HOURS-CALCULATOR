@@ -1,5 +1,4 @@
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html><html>
 <head>
   <meta charset="UTF-8">
   <title>NSC Service Hours Calculator</title>
@@ -28,9 +27,7 @@
     <label>Overtime After Shift 2 (optional): <input type="text" id="otAfter"></label>
     <button type="submit">Submit Day</button>
   </form>
-  <button onclick="downloadPDF()">Download PDF</button>
-
-  <table id="results">
+  <button onclick="downloadPDF()">Download PDF</button>  <table id="results">
     <thead>
       <tr>
         <th>Day</th>
@@ -45,11 +42,9 @@
       </tr>
     </thead>
     <tbody></tbody>
-  </table>
-
-  <script>
+  </table>  <script>
     let lastDayEnd = null;
-    let currentDay = 1;
+    let currentDay = 0;
     let sevenDayWindow = [];
     let totalOffDutyAccumulated = 0;
 
@@ -102,9 +97,14 @@
       let offDuty = 1440;
       if (lastDayEnd !== null) {
         let startMin = timeToMinutes(s1s);
-        if (startMin < lastDayEnd) startMin += 1440;
+        if (startMin <= lastDayEnd) startMin += 1440;
         offDuty = startMin - lastDayEnd;
         totalOffDutyAccumulated += offDuty;
+        if (offDuty >= 480) currentDay++;
+      } else {
+        offDuty = 1440;
+        totalOffDutyAccumulated = 1440;
+        currentDay++;
       }
 
       if (isCycleReset(totalOffDutyAccumulated)) {
@@ -112,30 +112,25 @@
         totalOffDutyAccumulated = 0;
       }
 
-      if (lastDayEnd === null || offDuty >= 480) {
-        currentDay++;
-      }
-
       let violation = [];
       if (totalDutyMins / 60 > 14) violation.push("Over 14h duty");
-      if (tet / 60 > 16) violation.push("TET >16h");
+      if (tet / 60 > 16) violation.push("TET over 16h");
       if (offDuty < 480) violation.push("Off-duty <8h");
 
-      lastDayEnd = timeToMinutes(s2e || s1e);
+      let endTime = timeToMinutes(s2e || s1e);
+      if (endTime < timeToMinutes(s1s)) endTime += 1440;
+      lastDayEnd = endTime;
+
       sevenDayWindow.push(totalDutyMins / 60);
       if (sevenDayWindow.length > 7) sevenDayWindow.shift();
-      if (sevenDayWindow.reduce((a, b) => a + b, 0) > 70) violation.push("70h/7d");
+      if (sevenDayWindow.reduce((a, b) => a + b, 0) > 70) violation.push(">70h in 7 days");
 
       let row = `<tr>
-        <td>${currentDay - 1}</td>
+        <td>${currentDay}</td>
         <td>${s1s || "-"} to ${s1e || "-"} (${minutesToHours(shift1Mins)}h)</td>
         <td>${s2s && s2e ? `${s2s} to ${s2e} (${minutesToHours(shift2Mins)}h)` : "-"}</td>
         <td>${minutesToHours(splitMins)}h</td>
-        <td>
-          ${minutesToHours(otBeforeMins)} / 
-          ${minutesToHours(otBetweenMins)} / 
-          ${minutesToHours(otAfterMins)} h
-        </td>
+        <td>${minutesToHours(otBeforeMins)} / ${minutesToHours(otBetweenMins)} / ${minutesToHours(otAfterMins)} h</td>
         <td>${minutesToHours(totalDutyMins)}h</td>
         <td>${minutesToHours(tet)}h</td>
         <td>${minutesToHours(offDuty)}h</td>
@@ -159,6 +154,5 @@
       doc.addImage(imgData, "PNG", 10, 20, pdfWidth - 20, pdfHeight);
       doc.save("NSC_Service_Hours.pdf");
     }
-  </script>
-</body>
+  </script></body>
 </html>
