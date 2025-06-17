@@ -1,145 +1,201 @@
-<script>
-  const entries = [];
-  let cumulativeDuty = 0;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NSC Service Hours Calculator</title>
+  <style>
+    body { font-family: Arial; padding: 20px; background: #f2f2f2; }
+    table { border-collapse: collapse; width: 100%; background: white; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+    input { margin-bottom: 5px; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    .form-row { margin-bottom: 10px; }
+    button { margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h2>NSC Service Hours Calculator</h2>
 
-  function parseTime(str) {
-    if (!str) return null;
-    let hour = parseInt(str.slice(0, 2), 10);
-    let min = parseInt(str.slice(2), 10);
-    return hour + min / 60;
-  }
+  <label for="date">Date:</label>
+  <input type="date" id="date"><br>
 
-  function formatTime24To12(time24) {
-    const hours = Math.floor(time24) % 24;
-    const minutes = Math.round((time24 % 1) * 60);
-    const suffix = hours >= 12 ? "PM" : "AM";
-    const displayHour = ((hours + 11) % 12 + 1);
-    return `${displayHour}:${minutes.toString().padStart(2, "0")} ${suffix}`;
-  }
+  <label>Shift 1 Start (e.g., 0500):</label>
+  <input type="text" id="shift1Start"><br>
 
-  function formatTimeRange(start, end) {
-    if (start == null || end == null) return "-";
-    const duration = (end >= start ? end - start : 24 + end - start);
-    return `${formatTime24To12(start)} to ${formatTime24To12(end)} (${duration.toFixed(2)}h)`;
-  }
+  <label>Shift 1 End (e.g., 1300):</label>
+  <input type="text" id="shift1End"><br>
 
-  function submitDay() {
-    const date = document.getElementById("date").value;
-    const s1Start = parseTime(document.getElementById("shift1Start").value);
-    const s1End = parseTime(document.getElementById("shift1End").value);
-    const s2Start = parseTime(document.getElementById("shift2Start").value);
-    const s2End = parseTime(document.getElementById("shift2End").value);
-    const otBefore = parseFloat(document.getElementById("otBefore").value) || 0;
-    const otBetween = parseFloat(document.getElementById("otBetween").value) || 0;
-    const otAfter = parseFloat(document.getElementById("otAfter").value) || 0;
+  <label>Shift 2 Start (optional):</label>
+  <input type="text" id="shift2Start"><br>
 
-    const shift1Duration = (s1Start != null && s1End != null) ? ((s1End - s1Start + 24) % 24) : 0;
-    const shift2Duration = (s2Start != null && s2End != null) ? ((s2End - s2Start + 24) % 24) : 0;
-    const splitHours = (s1End != null && s2Start != null) ? ((s2Start - s1End + 24) % 24) : 0;
-    const totalDuty = shift1Duration + shift2Duration + otBefore + otBetween + otAfter;
-    const TET = shift1Duration + shift2Duration;
-    const TETStart = s1Start != null ? s1Start : s2Start;
-    const TETEnd = s2End != null ? s2End : s1End;
+  <label>Shift 2 End (optional):</label>
+  <input type="text" id="shift2End"><br>
 
-    cumulativeDuty += totalDuty;
+  <label>Overtime Before Shift 1 (optional):</label>
+  <input type="text" id="otBefore"><br>
 
-    const dayNumber = entries.length + 1;
-    let offDuty = 24;
-    let violation = "None";
+  <label>Overtime Between Shifts (optional):</label>
+  <input type="text" id="otBetween"><br>
 
-    if (entries.length > 0) {
-      const prev = entries[entries.length - 1];
-      const prevEnd = prev.endTime;
-      const todayStart = s1Start != null ? s1Start : s2Start;
-      const timeGap = (todayStart - prevEnd + 24) % 24;
-      offDuty = timeGap;
-      if (offDuty < 8) violation = "Off-duty <8h";
+  <label>Overtime After Shift 2 (optional):</label>
+  <input type="text" id="otAfter"><br>
+
+  <button onclick="submitDay()">Submit Day</button>
+  <button onclick="downloadPDF()">Download PDF</button>
+
+  <table id="results">
+    <thead>
+      <tr>
+        <th>Day</th>
+        <th>Date</th>
+        <th>Shift 1</th>
+        <th>Shift 2</th>
+        <th>Split Hours</th>
+        <th>Overtime (Before / Between / After)</th>
+        <th>Total Duty</th>
+        <th>Cumulative Duty</th>
+        <th>TET (Start to End)</th>
+        <th>Off-Duty</th>
+        <th>NSC Violation</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const entries = [];
+    let cumulativeDuty = 0;
+
+    function parseTime(str) {
+      if (!str) return null;
+      let hour = parseInt(str.slice(0, 2), 10);
+      let min = parseInt(str.slice(2), 10);
+      return hour + min / 60;
     }
 
-    if (totalDuty > 14) violation = "Over 14h duty";
-    if (TET > 16) violation = "Over 16h TET";
-
-    const endTime = s2End != null ? s2End : s1End;
-
-    entries.push({
-      date,
-      dayNumber,
-      shift1: formatTimeRange(s1Start, s1End),
-      shift2: formatTimeRange(s2Start, s2End),
-      splitHours: splitHours.toFixed(2) + "h",
-      overtime: `${otBefore.toFixed(2)} / ${otBetween.toFixed(2)} / ${otAfter.toFixed(2)} h`,
-      totalDuty: totalDuty.toFixed(2) + "h",
-      TET: `${formatTime24To12(TETStart)} to ${formatTime24To12(TETEnd)} (${TET.toFixed(2)}h)`,
-      offDuty: offDuty.toFixed(2) + "h",
-      violation,
-      endTime,
-      cumulativeDuty: cumulativeDuty.toFixed(2) + "h"
-    });
-
-    renderTable();
-    clearInputs();
-  }
-
-  function renderTable() {
-    const tbody = document.querySelector("#results tbody");
-    tbody.innerHTML = "";
-    entries.forEach((entry, i) => {
-      const row = document.createElement("tr");
-      row.innerHTML = `
-        <td>${entry.dayNumber}</td>
-        <td>${entry.date}</td>
-        <td>${entry.shift1}</td>
-        <td>${entry.shift2}</td>
-        <td>${entry.splitHours}</td>
-        <td>${entry.overtime}</td>
-        <td>${entry.totalDuty}</td>
-        <td>${entry.TET}</td>
-        <td>${entry.offDuty}</td>
-        <td>${entry.violation}</td>
-        <td><button onclick="deleteEntry(${i})">Delete</button></td>
-      `;
-      tbody.appendChild(row);
-    });
-
-    // Display cumulative duty below table
-    const footer = document.getElementById("cumulativeFooter");
-    if (!footer) {
-      const cumRow = document.createElement("tr");
-      cumRow.id = "cumulativeFooter";
-      cumRow.innerHTML = `
-        <td colspan="11" style="text-align:right; font-weight:bold; background:#e2e2e2;">
-          Cumulative Duty Time: ${cumulativeDuty.toFixed(2)}h
-        </td>
-      `;
-      tbody.appendChild(cumRow);
-    } else {
-      footer.innerHTML = `
-        <td colspan="11" style="text-align:right; font-weight:bold; background:#e2e2e2;">
-          Cumulative Duty Time: ${cumulativeDuty.toFixed(2)}h
-        </td>
-      `;
+    function formatTime24To12(time24) {
+      const hours = Math.floor(time24) % 24;
+      const minutes = Math.round((time24 % 1) * 60);
+      const suffix = hours >= 12 ? "PM" : "AM";
+      const displayHour = ((hours + 11) % 12 + 1);
+      return `${displayHour}:${minutes.toString().padStart(2, "0")} ${suffix}`;
     }
-  }
 
-  function deleteEntry(index) {
-    cumulativeDuty -= parseFloat(entries[index].totalDuty);
-    entries.splice(index, 1);
-    entries.forEach((e, i) => e.dayNumber = i + 1);
-    renderTable();
-  }
+    function formatTimeRange(start, end) {
+      if (start == null || end == null) return "-";
+      const duration = (end >= start ? end - start : 24 + end - start);
+      return `${formatTime24To12(start)} to ${formatTime24To12(end)} (${duration.toFixed(2)}h)`;
+    }
 
-  function clearInputs() {
-    document.getElementById("date").value = "";
-    document.getElementById("shift1Start").value = "";
-    document.getElementById("shift1End").value = "";
-    document.getElementById("shift2Start").value = "";
-    document.getElementById("shift2End").value = "";
-    document.getElementById("otBefore").value = "";
-    document.getElementById("otBetween").value = "";
-    document.getElementById("otAfter").value = "";
-  }
+    function submitDay() {
+      const date = document.getElementById("date").value;
+      const s1Start = parseTime(document.getElementById("shift1Start").value);
+      const s1End = parseTime(document.getElementById("shift1End").value);
+      const s2Start = parseTime(document.getElementById("shift2Start").value);
+      const s2End = parseTime(document.getElementById("shift2End").value);
+      const otBefore = parseFloat(document.getElementById("otBefore").value) || 0;
+      const otBetween = parseFloat(document.getElementById("otBetween").value) || 0;
+      const otAfter = parseFloat(document.getElementById("otAfter").value) || 0;
 
-  function downloadPDF() {
-    alert("PDF export will be added soon.");
-  }
-</script>
+      const shift1Duration = (s1Start != null && s1End != null) ? ((s1End - s1Start + 24) % 24) : 0;
+      const shift2Duration = (s2Start != null && s2End != null) ? ((s2End - s2Start + 24) % 24) : 0;
+      const splitHours = (s1End != null && s2Start != null) ? ((s2Start - s1End + 24) % 24) : 0;
+      const totalDuty = shift1Duration + shift2Duration + otBefore + otBetween + otAfter;
+      const TET = shift1Duration + shift2Duration;
+      const TETStart = s1Start != null ? s1Start : s2Start;
+      const TETEnd = s2End != null ? s2End : s1End;
+
+      cumulativeDuty += totalDuty;
+
+      const dayNumber = entries.length + 1;
+      let offDuty = 24;
+      let violation = "None";
+
+      if (entries.length > 0) {
+        const prev = entries[entries.length - 1];
+        const prevEnd = prev.endTime;
+        const todayStart = s1Start != null ? s1Start : s2Start;
+        const timeGap = (todayStart - prevEnd + 24) % 24;
+        offDuty = timeGap;
+
+        // Reset if it's a new calendar date and 24+ hours passed
+        if (prev.date !== date && timeGap >= 24) {
+          offDuty = 24;
+          violation = "None";
+        } else if (offDuty < 8) {
+          violation = "Off-duty <8h";
+        }
+      }
+
+      if (totalDuty > 14) violation = "Over 14h duty";
+      if (TET > 16) violation = "Over 16h TET";
+
+      const endTime = s2End != null ? s2End : s1End;
+
+      entries.push({
+        date,
+        dayNumber,
+        shift1: formatTimeRange(s1Start, s1End),
+        shift2: formatTimeRange(s2Start, s2End),
+        splitHours: splitHours.toFixed(2) + "h",
+        overtime: `${otBefore.toFixed(2)} / ${otBetween.toFixed(2)} / ${otAfter.toFixed(2)} h`,
+        totalDuty: totalDuty.toFixed(2) + "h",
+        cumulativeDuty: cumulativeDuty.toFixed(2) + "h",
+        TET: `${formatTime24To12(TETStart)} to ${formatTime24To12(TETEnd)} (${TET.toFixed(2)}h)`,
+        offDuty: offDuty.toFixed(2) + "h",
+        violation,
+        endTime
+      });
+
+      renderTable();
+      clearInputs();
+    }
+
+    function renderTable() {
+      const tbody = document.querySelector("#results tbody");
+      tbody.innerHTML = "";
+      entries.forEach((entry, i) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${entry.dayNumber}</td>
+          <td>${entry.date}</td>
+          <td>${entry.shift1}</td>
+          <td>${entry.shift2}</td>
+          <td>${entry.splitHours}</td>
+          <td>${entry.overtime}</td>
+          <td>${entry.totalDuty}</td>
+          <td>${entry.cumulativeDuty}</td>
+          <td>${entry.TET}</td>
+          <td>${entry.offDuty}</td>
+          <td>${entry.violation}</td>
+          <td><button onclick="deleteEntry(${i})">Delete</button></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function deleteEntry(index) {
+      cumulativeDuty -= parseFloat(entries[index].totalDuty);
+      entries.splice(index, 1);
+      entries.forEach((e, i) => e.dayNumber = i + 1);
+      renderTable();
+    }
+
+    function clearInputs() {
+      document.getElementById("date").value = "";
+      document.getElementById("shift1Start").value = "";
+      document.getElementById("shift1End").value = "";
+      document.getElementById("shift2Start").value = "";
+      document.getElementById("shift2End").value = "";
+      document.getElementById("otBefore").value = "";
+      document.getElementById("otBetween").value = "";
+      document.getElementById("otAfter").value = "";
+    }
+
+    function downloadPDF() {
+      alert("PDF export feature coming soon.");
+    }
+  </script>
+</body>
+</html>
