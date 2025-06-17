@@ -47,6 +47,7 @@
     let lastDayEnd = null;
     let currentDay = 1;
     let sevenDayWindow = [];
+    let totalOffDutyAccumulated = 0;
 
     function timeToMinutes(timeStr) {
       if (!timeStr) return null;
@@ -66,6 +67,10 @@
       let e = timeToMinutes(end);
       if (e < s) e += 1440;
       return e - s;
+    }
+
+    function isCycleReset(offDutyMinutes) {
+      return offDutyMinutes >= 2160; // 36 hours
     }
 
     document.getElementById('nscForm').addEventListener('submit', function(event) {
@@ -95,6 +100,12 @@
         let startMin = timeToMinutes(s1s);
         if (startMin < lastDayEnd) startMin += 1440;
         offDuty = startMin - lastDayEnd;
+        totalOffDutyAccumulated += offDuty;
+      }
+
+      if (isCycleReset(totalOffDutyAccumulated)) {
+        sevenDayWindow = [];
+        totalOffDutyAccumulated = 0;
       }
 
       if (lastDayEnd === null || offDuty >= 480) {
@@ -103,7 +114,6 @@
 
       let violation = [];
       if (totalDutyMins / 60 > 14) violation.push("Over 14h duty");
-      if ((shift1Mins + shift2Mins) / 60 > 13) violation.push("Over 13h driving");
       if (tet / 60 > 16) violation.push("TET over 16h");
       if (offDuty < 480) violation.push("<8h off-duty");
 
