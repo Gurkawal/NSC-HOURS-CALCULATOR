@@ -2,129 +2,145 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>NSC Service Hours Calculator</title>
+  <title>NSC Hours Tracker</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: #f4f6f9;
+      background: #f1f3f5;
       margin: 0;
-      padding: 20px;
+      padding: 10px;
     }
     .container {
-      max-width: 1100px;
+      max-width: 800px;
       margin: auto;
-      background: #fff;
-      padding: 25px;
+      background: white;
+      padding: 20px;
       border-radius: 12px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.07);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
     h2 {
       text-align: center;
-      color: #007bff;
-    }
-    .form-section {
+      color: #0056b3;
       margin-bottom: 20px;
     }
-    .form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-      gap: 15px;
-    }
     label {
-      font-weight: 600;
-      margin-top: 10px;
       display: block;
+      margin-top: 12px;
+      font-weight: 500;
     }
     input, select {
       width: 100%;
       padding: 8px;
       margin-top: 5px;
+      border-radius: 5px;
       border: 1px solid #ccc;
-      border-radius: 6px;
+      box-sizing: border-box;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .group > div {
+      flex: 1 1 48%;
+    }
+    .buttons {
+      display: flex;
+      justify-content: space-between;
+      position: sticky;
+      bottom: 0;
+      background: white;
+      padding: 10px 0 0;
+      border-top: 1px solid #ddd;
+      margin-top: 20px;
     }
     button {
-      padding: 10px 18px;
-      background-color: #007bff;
+      background: #007bff;
       color: white;
       border: none;
-      border-radius: 6px;
+      padding: 10px 16px;
+      border-radius: 5px;
+      font-size: 16px;
       cursor: pointer;
-      margin: 10px 5px 0 0;
     }
     button:hover {
-      background-color: #0056b3;
-    }
-    .button-group {
-      text-align: right;
+      background: #0056b3;
     }
     table {
       width: 100%;
-      margin-top: 25px;
       border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 14px;
     }
     th, td {
-      border: 1px solid #ddd;
+      border: 1px solid #ccc;
       padding: 6px;
       text-align: center;
-      font-size: 0.9em;
     }
     th {
-      background-color: #007bff;
+      background: #007bff;
       color: white;
     }
-    .cycle-toggle {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-top: 10px;
+    @media (max-width: 600px) {
+      .group > div {
+        flex: 1 1 100%;
+      }
+      table {
+        font-size: 12px;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>NSC Service Hours Calculator</h2>
+    <h2>NSC Service Hours Tracker</h2>
 
-    <div class="cycle-toggle">
-      <label><b>Select Cycle:</b></label>
+    <div class="section">
+      <label for="cycle">Select Cycle</label>
       <select id="cycle">
-        <option value="1">Cycle 1 (70hr/7 days)</option>
-        <option value="2">Cycle 2 (120hr/14 days)</option>
+        <option value="1">Cycle 1 (70hr / 7 days)</option>
+        <option value="2">Cycle 2 (120hr / 14 days, 13 max working days)</option>
       </select>
     </div>
 
-    <div class="form-section">
-      <div class="form-grid">
-        <div><label>Date:</label><input type="date" id="date"></div>
+    <div class="section group">
+      <div>
+        <label for="date">Date</label>
+        <input type="date" id="date">
       </div>
     </div>
 
-    <div class="form-section">
-      <h4>Shift 1</h4>
-      <div class="form-grid">
-        <div><label>Start Time (e.g., 0530):</label><input type="text" id="shift1Start"></div>
-        <div><label>End Time (e.g., 1230):</label><input type="text" id="shift1End"></div>
+    <div class="section">
+      <strong>Shift 1</strong>
+      <div class="group">
+        <div><label>Start Time</label><input type="text" id="shift1Start" placeholder="e.g., 0530"></div>
+        <div><label>End Time</label><input type="text" id="shift1End" placeholder="e.g., 1230"></div>
       </div>
     </div>
 
-    <div class="form-section">
-      <h4>Shift 2 (optional)</h4>
-      <div class="form-grid">
-        <div><label>Start Time:</label><input type="text" id="shift2Start"></div>
-        <div><label>End Time:</label><input type="text" id="shift2End"></div>
+    <div class="section">
+      <strong>Shift 2 (Optional)</strong>
+      <div class="group">
+        <div><label>Start Time</label><input type="text" id="shift2Start"></div>
+        <div><label>End Time</label><input type="text" id="shift2End"></div>
       </div>
     </div>
 
-    <div class="form-section">
-      <h4>Overtime</h4>
-      <div class="form-grid">
-        <div><label>Before Shift 1 (e.g., 0430 to 0500):</label><input type="text" id="otBeforeTime"></div>
-        <div><label>Between Shifts (e.g., 1400 to 1500):</label><input type="text" id="otBetweenTime"></div>
-        <div><label>After Shift 2 (e.g., 1900 to 2000):</label><input type="text" id="otAfterTime"></div>
+    <div class="section">
+      <strong>Overtime</strong>
+      <div class="group">
+        <div><label>Before Shift 1</label><input type="text" id="otBeforeTime" placeholder="0430 to 0500"></div>
+        <div><label>Between Shifts</label><input type="text" id="otBetweenTime" placeholder="1400 to 1500"></div>
+        <div><label>After Shift 2</label><input type="text" id="otAfterTime" placeholder="1900 to 2000"></div>
       </div>
     </div>
 
-    <div class="button-group">
+    <div class="buttons">
       <button onclick="submitDay()">Submit Day</button>
       <button onclick="downloadPDF()">Download PDF</button>
     </div>
@@ -132,13 +148,12 @@
     <table id="results">
       <thead>
         <tr>
-          <th>Day</th>
+          <th>#</th>
           <th>Date</th>
           <th>Shift 1</th>
           <th>Shift 2</th>
-          <th>Split Hours</th>
           <th>OT (B/Btwn/A)</th>
-          <th>Total Duty</th>
+          <th>Duty</th>
           <th>Cumulative</th>
           <th>TET</th>
           <th>Off-Duty</th>
@@ -196,6 +211,18 @@
         .reduce((sum, e) => sum + e.totalDuty, 0);
     }
 
+    function getConsecutiveWorkDays() {
+      const sorted = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
+      let count = 1;
+      for (let i = sorted.length - 2; i >= 0; i--) {
+        const d1 = new Date(sorted[i + 1].date);
+        const d2 = new Date(sorted[i].date);
+        if ((d1 - d2) / (1000 * 60 * 60 * 24) === 1) count++;
+        else break;
+      }
+      return count;
+    }
+
     function submitDay() {
       const date = document.getElementById("date").value;
       const shift1Start = parseTime(document.getElementById("shift1Start").value);
@@ -209,16 +236,18 @@
 
       const shift1Hours = timeDiff(shift1Start, shift1End);
       const shift2Hours = timeDiff(shift2Start, shift2End);
-      const splitHours = shift2Start ? timeDiff(shift1End, shift2Start) : 0;
       const totalDuty = shift1Hours + shift2Hours + otBefore + otBetween + otAfter;
       const tet = shift2End ? timeDiff(shift1Start, shift2End) : shift1Hours;
       const offDuty = 24 - tet;
       const cumulative = cycle === "1" ? getCumulative(7) + totalDuty : getCumulative(14) + totalDuty;
 
-      const violation = (totalDuty > 14 || tet > 16 || (cycle === "1" && cumulative > 70) || (cycle === "2" && cumulative > 120)) ? "YES" : "";
+      let violation = "";
+      if (totalDuty > 14 || tet > 16) violation = "Duty Limit";
+      else if (cycle === "1" && cumulative > 70) violation = "Cycle 1 Limit";
+      else if (cycle === "2" && cumulative > 120) violation = "Cycle 2 Limit";
+      else if (cycle === "2" && getConsecutiveWorkDays() >= 13) violation = "Must Take Day Off";
 
-      entries.push({ date, shift1Start, shift1End, shift2Start, shift2End, splitHours, otBefore, otBetween, otAfter, totalDuty, cumulative, tet, offDuty, violation });
-
+      entries.push({ date, shift1Start, shift1End, shift2Start, shift2End, otBefore, otBetween, otAfter, totalDuty, cumulative, tet, offDuty, violation });
       renderTable();
     }
 
@@ -232,7 +261,6 @@
           <td>${e.date}</td>
           <td>${formatTimeRange(e.shift1Start, e.shift1End)}</td>
           <td>${e.shift2Start ? formatTimeRange(e.shift2Start, e.shift2End) : "-"}</td>
-          <td>${e.splitHours.toFixed(2)}</td>
           <td>${e.otBefore.toFixed(2)} / ${e.otBetween.toFixed(2)} / ${e.otAfter.toFixed(2)}</td>
           <td>${e.totalDuty.toFixed(2)}</td>
           <td>${e.cumulative.toFixed(2)}</td>
