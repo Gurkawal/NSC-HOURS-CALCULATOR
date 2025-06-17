@@ -1,32 +1,45 @@
 <!DOCTYPE html><html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NSC Compliance Tracker</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; background: #f8f9fa; }
-    h1 { color: #333; }
-    input[type="time"], button { margin: 4px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background-color: #f1f1f1; }
-    tr:nth-child(even) { background-color: #f9f9f9; }
-    .violation { color: red; font-weight: bold; }
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #aaa;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    input[type="time"], input[type="number"] {
+      width: 100px;
+    }
+    .form-row {
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
-  <h1>NSC Compliance Tracker</h1>
-  <div>
-    <label>Shift 1 Start: <input type="time" id="shift1Start"></label>
-    <label>Shift 1 End: <input type="time" id="shift1End"></label>
-    <br>
+  <h2>NSC Compliance Tracker</h2>  <div class="form-row">
+    <label>Shift 1 Start: <input type="time" id="shift1Start" required></label>
+    <label>Shift 1 End: <input type="time" id="shift1End" required></label>
     <label>Shift 2 Start: <input type="time" id="shift2Start"></label>
     <label>Shift 2 End: <input type="time" id="shift2End"></label>
-    <br>
-    <button onclick="submitDay()">Submit Day</button>
-    <button onclick="resetTracker()">Reset All</button>
-  </div>
-  <table id="results">
+    <label>Overtime Before (h): <input type="number" id="otBefore" step="0.25" value="0"></label>
+    <label>Overtime Between (h): <input type="number" id="otBetween" step="0.25" value="0"></label>
+    <label>Overtime After (h): <input type="number" id="otAfter" step="0.25" value="0"></label>
+    <button onclick="submitShift()">Submit</button>
+  </div>  <table id="resultTable">
     <thead>
       <tr>
         <th>Day</th>
@@ -38,116 +51,111 @@
         <th>TET</th>
         <th>Off-Duty</th>
         <th>NSC Violation</th>
+        <th>Cumulative Duty</th>
         <th>Action</th>
       </tr>
     </thead>
-    <tbody id="resultBody"></tbody>
+    <tbody id="tableBody"></tbody>
   </table>  <script>
-    let shifts = [];
+    let dayCounter = 1;
+    let lastEndMinutes = null;
+    let totalDutySum = 0;
 
-    function toMinutes(timeStr) {
-      const [h, m] = timeStr.split(":").map(Number);
+    function parseTimeToMinutes(time) {
+      const [h, m] = time.split(":").map(Number);
       return h * 60 + m;
     }
 
-    function formatTime(start, end) {
-      const startMin = toMinutes(start);
-      const endMin = toMinutes(end);
-      const dur = ((endMin + 1440 - startMin) % 1440) / 60;
-      return `${start} to ${end} (${dur.toFixed(2)}h)`;
+    function formatHM(minutes) {
+      const h = Math.floor(minutes / 60);
+      const m = Math.round(minutes % 60);
+      return `${h}.${m.toString().padStart(2, '0')}h`;
     }
 
-    function calcHours(start, end) {
-      const s = toMinutes(start);
-      const e = toMinutes(end);
-      return ((e + 1440 - s) % 1440) / 60;
-    }
+    function submitShift() {
+      const shift1Start = document.getElementById("shift1Start").value;
+      const shift1End = document.getElementById("shift1End").value;
+      const shift2Start = document.getElementById("shift2Start").value;
+      const shift2End = document.getElementById("shift2End").value;
+      const otBefore = parseFloat(document.getElementById("otBefore").value) || 0;
+      const otBetween = parseFloat(document.getElementById("otBetween").value) || 0;
+      const otAfter = parseFloat(document.getElementById("otAfter").value) || 0;
 
-    function submitDay() {
-      const s1Start = document.getElementById("shift1Start").value;
-      const s1End = document.getElementById("shift1End").value;
-      const s2Start = document.getElementById("shift2Start").value;
-      const s2End = document.getElementById("shift2End").value;
-
-      if (!s1Start || !s1End) {
-        alert("Shift 1 is required.");
+      if (!shift1Start || !shift1End) {
+        alert("Shift 1 start and end time are required");
         return;
       }
 
-      let shift1Hours = calcHours(s1Start, s1End);
-      let shift2Hours = s2Start && s2End ? calcHours(s2Start, s2End) : 0;
-      let splitHours = s2Start ? calcHours(s1End, s2Start) : 0;
-      let totalDuty = shift1Hours + shift2Hours;
-      let tet = totalDuty + splitHours;
+      const s1StartMin = parseTimeToMinutes(shift1Start);
+      let s1EndMin = parseTimeToMinutes(shift1End);
+      if (s1EndMin < s1StartMin) s1EndMin += 1440; // next day
+      const shift1Duration = s1EndMin - s1StartMin;
 
-      let prev = shifts[shifts.length - 1];
-      let prevEnd = prev ? prev.endTime : null;
-      let currStart = s1Start;
+      let shift2Duration = 0, s2StartMin = 0, s2EndMin = 0, splitHours = 0;
+      let shift2Str = "-";
 
-      let offDuty = 24.0;
-      let violation = "None";
-
-      if (prevEnd) {
-        let prevMinutes = toMinutes(prevEnd);
-        let currMinutes = toMinutes(currStart);
-        let offMin = (currMinutes + 1440 - prevMinutes) % 1440;
-        if (offMin < 480) {
-          violation = "Off-duty <8h";
-        }
-        offDuty = (offMin / 60).toFixed(2);
+      if (shift2Start && shift2End) {
+        s2StartMin = parseTimeToMinutes(shift2Start);
+        s2EndMin = parseTimeToMinutes(shift2End);
+        if (s2EndMin < s2StartMin) s2EndMin += 1440;
+        shift2Duration = s2EndMin - s2StartMin;
+        splitHours = (s2StartMin - s1EndMin) / 60;
+        if (splitHours < 0) splitHours = 0;
+        shift2Str = `${shift2Start} to ${shift2End} (${formatHM(shift2Duration)})`;
       }
 
-      const newShift = {
-        day: shifts.length + 1,
-        shift1: formatTime(s1Start, s1End),
-        shift2: s2Start && s2End ? formatTime(s2Start, s2End) : "-",
-        split: splitHours.toFixed(2) + "h",
-        overtime: "0.00 / 0.00 / 0.00 h",
-        duty: totalDuty.toFixed(2) + "h",
-        tet: tet.toFixed(2) + "h",
-        offDuty: offDuty + "h",
-        violation: violation,
-        endTime: s2End || s1End
-      };
+      const totalDuty = (shift1Duration + shift2Duration + (otBefore + otBetween + otAfter) * 60) / 60;
+      const TET = (shift1Duration + shift2Duration) / 60;
+      let offDuty = 0;
 
-      shifts.push(newShift);
-      render();
-      document.getElementById("shift1Start").value = "";
-      document.getElementById("shift1End").value = "";
-      document.getElementById("shift2Start").value = "";
-      document.getElementById("shift2End").value = "";
+      if (lastEndMinutes !== null) {
+        const currentStartMin = s1StartMin % 1440;
+        offDuty = (s1StartMin - lastEndMinutes) / 60;
+        if (offDuty < 0) offDuty += 1440; // day rollover
+      } else {
+        offDuty = 24;
+      }
+
+      lastEndMinutes = (shift2End ? s2EndMin : s1EndMin);
+      totalDutySum += totalDuty;
+
+      let violation = "None";
+      if (offDuty < 8) violation = "Off-duty <8h";
+      else if (TET > 14) violation = "TET > 14h";
+      else if (totalDuty > 16) violation = "Duty > 16h";
+
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${dayCounter}</td>
+        <td>${shift1Start} to ${shift1End} (${formatHM(shift1Duration)})</td>
+        <td>${shift2Str}</td>
+        <td>${splitHours.toFixed(2)}h</td>
+        <td>${otBefore.toFixed(2)} / ${otBetween.toFixed(2)} / ${otAfter.toFixed(2)} h</td>
+        <td>${formatHM((shift1Duration + shift2Duration + (otBefore + otBetween + otAfter) * 60))}</td>
+        <td>${formatHM(shift1Duration + shift2Duration)}</td>
+        <td>${offDuty.toFixed(2)}h</td>
+        <td>${violation}</td>
+        <td>${formatHM(totalDutySum * 60)}</td>
+        <td><button onclick="this.parentElement.parentElement.remove(); recalculateTotals()">Delete</button></td>
+      `;
+
+      document.getElementById("tableBody").appendChild(row);
+      dayCounter++;
+      document.querySelectorAll('input').forEach(el => el.value = "");
     }
 
-    function render() {
-      const body = document.getElementById("resultBody");
-      body.innerHTML = "";
-      shifts.forEach((s, i) => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${s.day}</td>
-          <td>${s.shift1}</td>
-          <td>${s.shift2}</td>
-          <td>${s.split}</td>
-          <td>${s.overtime}</td>
-          <td>${s.duty}</td>
-          <td>${s.tet}</td>
-          <td>${s.offDuty}</td>
-          <td class="${s.violation !== 'None' ? 'violation' : ''}">${s.violation}</td>
-          <td><button onclick="deleteDay(${i})">Delete</button></td>
-        `;
-        body.appendChild(tr);
+    function recalculateTotals() {
+      const rows = document.querySelectorAll("#tableBody tr");
+      let newTotal = 0;
+      rows.forEach((row, index) => {
+        const td = row.children;
+        const dutyText = td[5].innerText;
+        const duty = parseFloat(dutyText);
+        newTotal += duty;
+        td[0].innerText = index + 1;
+        td[9].innerText = formatHM(newTotal * 60);
       });
-    }
-
-    function deleteDay(index) {
-      shifts.splice(index, 1);
-      shifts.forEach((s, i) => s.day = i + 1);
-      render();
-    }
-
-    function resetTracker() {
-      shifts = [];
-      render();
+      dayCounter = rows.length + 1;
     }
   </script></body>
 </html>
