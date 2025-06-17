@@ -20,98 +20,178 @@
   <form id="nscForm">
     <label>Shift 1 Start (e.g., 0500): <input type="text" id="shift1Start"></label>
     <label>Shift 1 End (e.g., 1300): <input type="text" id="shift1End"></label>
+    <label>Shift 2 Start (optional): <input type="text" id="shift2Start"></label>
+    <label>Shift 2 End (optional): <input type="text" id="shift2End"></label>
+    <label>Overtime Before Shift 1 (optional): <input type="text" id="otBefore"></label>
+    <label>Overtime Between Shifts (optional): <input type="text" id="otBetween"></label>
+    <label>Overtime After Shift 2 (optional): <input type="text" id="otAfter"></label>
     <button type="submit">Submit Day</button>
-  </form>
-  <button onclick="downloadPDF()">Download PDF</button>
-  <table id="results">
+  </form><button onclick="downloadPDF()">Download PDF</button>  <table id="results">
     <thead>
       <tr>
         <th>Day</th>
         <th>Shift 1</th>
-        <th>Duty Hours</th>
-        <th>Off-Duty Hours</th>
+        <th>Shift 2</th>
+        <th>Split Hours</th>
+        <th>Overtime (Before / Between / After)</th>
+        <th>Total Duty</th>
+        <th>TET</th>
+        <th>Off-Duty</th>
         <th>NSC Violation</th>
+        <th>Action</th>
       </tr>
     </thead>
     <tbody></tbody>
-  </table>  <script>
-    let log = [];
-    let lastDayEnd = null;
-    let baseDay = 0;
+  </table><script>
+let log = [];
+let currentDay = 1;
+let lastDayEnd = null;
+let sevenDayWindow = [];
+let totalOffDutyAccumulated = 0;
 
-    function timeToMinutes(timeStr) {
-      if (!timeStr) return null;
-      let time = parseInt(timeStr);
-      let hour = Math.floor(time / 100);
-      let minute = time % 100;
-      return hour * 60 + minute;
-    }
+function timeToMinutes(timeStr) {
+  if (!timeStr) return null;
+  let time = parseInt(timeStr);
+  let hour = Math.floor(time / 100);
+  let minutes = time % 100;
+  return hour * 60 + minutes;
+}
 
-    function minutesToHours(mins) {
-      return (mins / 60).toFixed(2);
-    }
+function minutesToHours(mins) {
+  return (mins / 60).toFixed(2);
+}
 
-    function duration(start, end) {
-      if (!start || !end) return 0;
-      let s = timeToMinutes(start);
-      let e = timeToMinutes(end);
-      if (e < s) e += 1440;
-      return e - s;
-    }
+function duration(start, end) {
+  if (!start || !end) return 0;
+  let s = timeToMinutes(start);
+  let e = timeToMinutes(end);
+  if (e < s) e += 1440;
+  return e - s;
+}
 
-    document.getElementById('nscForm').addEventListener('submit', function(event) {
-      event.preventDefault();
+function isCycleReset(offDutyMinutes) {
+  return offDutyMinutes >= 2160; // 36 hours
+}
 
-      const s1s = document.getElementById('shift1Start').value;
-      const s1e = document.getElementById('shift1End').value;
+function deleteEntry(index) {
+  log.splice(index, 1);
+  totalOffDutyAccumulated = 0;
+  sevenDayWindow = [];
+  lastDayEnd = null;
+  currentDay = 1;
+  renderTable();
+}
 
-      const dutyMins = duration(s1s, s1e);
-      let offDuty = lastDayEnd !== null ? timeToMinutes(s1s) - lastDayEnd : 1440;
-      if (offDuty < 0) offDuty += 1440;
+function renderTable() {
+  const tbody = document.querySelector("#results tbody");
+  tbody.innerHTML = "";
+  log.forEach((entry, i) => {
+    const row = `<tr>
+      <td>${i + 1}</td>
+      <td>${entry.shift1} (${minutesToHours(entry.shift1Mins)}h)</td>
+      <td>${entry.shift2 || "-"}</td>
+      <td>${minutesToHours(entry.splitMins)}h</td>
+      <td>${entry.otBefore} / ${entry.otBetween} / ${entry.otAfter} h</td>
+      <td>${minutesToHours(entry.totalDutyMins)}h</td>
+      <td>${minutesToHours(entry.tet)}h</td>
+      <td>${minutesToHours(entry.offDuty)}h</td>
+      <td>${entry.violation.length ? entry.violation.join(", ") : "None"}</td>
+      <td><button onclick="deleteEntry(${i})">Delete</button></td>
+    </tr>`;
+    tbody.insertAdjacentHTML("beforeend", row);
+  });
+}
 
-      const violation = offDuty < 480 && lastDayEnd !== null ? 'Off-duty <8h' : 'None';
+document.getElementById('nscForm').addEventListener('submit', function(event) {
+  event.preventDefault();
+  const s1s = document.getElementById('shift1Start').value;
+  const s1e = document.getElementById('shift1End').value;
+  const s2s = document.getElementById('shift2Start').value;
+  const s2e = document.getElementById('shift2End').value;
+  const ot1 = document.getElementById('otBefore').value;
+  const ot2 = document.getElementById('otBetween').value;
+  const ot3 = document.getElementById('otAfter').value;
 
-      const newEntry = {
-        day: ++baseDay,
-        shift1: `${s1s} to ${s1e} (${minutesToHours(dutyMins)}h)`,
-        duty: `${minutesToHours(dutyMins)}h`,
-        off: `${minutesToHours(offDuty)}h`,
-        violation: violation
-      };
+  let s1sMin = timeToMinutes(s1s);
+  if (lastDayEnd !== null && s1sMin <= lastDayEnd) s1sMin += 1440;
 
-      log.push(newEntry);
-      lastDayEnd = timeToMinutes(s1e);
+  let s1eMin = timeToMinutes(s1e);
+  if (s1eMin < s1sMin) s1eMin += 1440;
 
-      renderTable();
-      document.getElementById('nscForm').reset();
-    });
+  const shift1Mins = s1eMin - s1sMin;
 
-    function renderTable() {
-      const tbody = document.querySelector('#results tbody');
-      tbody.innerHTML = '';
-      log.forEach((entry, index) => {
-        const row = `<tr>
-          <td>${entry.day}</td>
-          <td>${entry.shift1}</td>
-          <td>${entry.duty}</td>
-          <td>${entry.off}</td>
-          <td>${entry.violation}</td>
-        </tr>`;
-        tbody.insertAdjacentHTML('beforeend', row);
-      });
-    }
+  let s2sMin = timeToMinutes(s2s);
+  let s2eMin = timeToMinutes(s2e);
+  let shift2Mins = 0;
+  let splitMins = 0;
 
-    async function downloadPDF() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      const table = document.getElementById("results");
-      const canvas = await html2canvas(table);
-      const imgData = canvas.toDataURL("image/png");
-      const pdfWidth = doc.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      doc.text("NSC Service Hours Log", 10, 10);
-      doc.addImage(imgData, "PNG", 10, 20, pdfWidth - 20, pdfHeight);
-      doc.save("NSC_Service_Hours.pdf");
-    }
-  </script></body>
+  if (s2sMin !== null && s2eMin !== null) {
+    if (s2sMin < s1eMin) s2sMin += 1440;
+    if (s2eMin < s2sMin) s2eMin += 1440;
+    shift2Mins = s2eMin - s2sMin;
+    splitMins = s2sMin - s1eMin;
+  }
+
+  let otBeforeMins = ot1 && s1s ? duration(ot1, s1s) : 0;
+  let otBetweenMins = s1e && ot2 ? duration(s1e, ot2) : 0;
+  let otAfterMins = (s2e || s1e) && ot3 ? duration(s2e || s1e, ot3) : 0;
+  let otMins = otBeforeMins + otBetweenMins + otAfterMins;
+
+  const totalDutyMins = shift1Mins + shift2Mins + otMins;
+  const tet = s2eMin ? s2eMin - s1sMin : shift1Mins;
+
+  let offDuty = 1440;
+  if (lastDayEnd !== null) {
+    if (s1sMin < lastDayEnd) s1sMin += 1440;
+    offDuty = s1sMin - lastDayEnd;
+    totalOffDutyAccumulated += offDuty;
+  }
+
+  if (isCycleReset(totalOffDutyAccumulated)) {
+    sevenDayWindow = [];
+    totalOffDutyAccumulated = 0;
+  }
+
+  const violation = [];
+  if (totalDutyMins > 14 * 60) violation.push("Over 14h duty");
+  if (tet > 16 * 60) violation.push("TET over 16h");
+  if (offDuty < 480) violation.push("Off-duty <8h");
+
+  sevenDayWindow.push(totalDutyMins / 60);
+  if (sevenDayWindow.length > 7) sevenDayWindow.shift();
+  if (sevenDayWindow.reduce((a, b) => a + b, 0) > 70) violation.push(">70h in 7 days");
+
+  log.push({
+    shift1: `${s1s} to ${s1e}`,
+    shift2: s2s && s2e ? `${s2s} to ${s2e} (${minutesToHours(shift2Mins)}h)` : "-",
+    shift1Mins,
+    splitMins,
+    otBefore: minutesToHours(otBeforeMins),
+    otBetween: minutesToHours(otBetweenMins),
+    otAfter: minutesToHours(otAfterMins),
+    totalDutyMins,
+    tet,
+    offDuty,
+    violation
+  });
+
+  lastDayEnd = s2eMin || s1eMin;
+  renderTable();
+  document.getElementById("nscForm").reset();
+});
+
+async function downloadPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const table = document.getElementById("results");
+  const canvas = await html2canvas(table);
+  const imgData = canvas.toDataURL("image/png");
+  const imgProps = doc.getImageProperties(imgData);
+  const pdfWidth = doc.internal.pageSize.getWidth();
+  const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+  doc.text("NSC Service Hours Log", 10, 10);
+  doc.addImage(imgData, "PNG", 10, 20, pdfWidth - 20, pdfHeight);
+  doc.save("NSC_Service_Hours.pdf");
+}
+</script></body>
 </html>
